@@ -1,0 +1,252 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #1a1a2e;
+  color: #e0e0e0;
+  overflow: hidden;
+  height: 100vh;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #16213e;
+  border-bottom: 1px solid #2a2a4a;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  padding: 6px 10px;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  background: #1a1a3e;
+  color: #e0e0e0;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+.toolbar button:hover {
+  background: #2a2a5e;
+  border-color: #5a5aaa;
+}
+
+.toolbar button.primary {
+  background: #4a4ae0;
+  border-color: #6a6af0;
+  color: white;
+  font-weight: 600;
+}
+
+.toolbar button.primary:hover {
+  background: #5a5af0;
+}
+
+.toolbar button.primary:disabled {
+  background: #3a3a6a;
+  border-color: #3a3a5a;
+  color: #8a8a9a;
+  cursor: not-allowed;
+}
+
+.toolbar .separator {
+  width: 1px;
+  height: 24px;
+  background: #3a3a5a;
+}
+
+.result-panel {
+  max-height: 40vh;
+  overflow-y: auto;
+  padding: 12px;
+  background: #0f0f23;
+  border-top: 1px solid #2a2a4a;
+}
+
+.result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.result-panel h3 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a8aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.copy-btn {
+  padding: 3px 10px;
+  border: 1px solid #3a3a5a;
+  border-radius: 4px;
+  background: #1a1a3e;
+  color: #b0b0d0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+  background: #2a2a5e;
+  border-color: #5a5aaa;
+  color: #e0e0f0;
+}
+
+.result-panel .response-text {
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: #d0d0e0;
+}
+
+.result-panel .error-text {
+  color: #ff6b6b;
+}
+
+.result-panel .loading {
+  color: #8a8aaa;
+  font-style: italic;
+}
+
+.api-key-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  background: #0f0f23;
+  border-bottom: 1px solid #2a2a4a;
+}
+
+.api-key-bar input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  background: #1a1a3e;
+  color: #e0e0e0;
+  font-size: 12px;
+}
+
+.api-key-bar input:focus {
+  outline: none;
+  border-color: #4a4ae0;
+}
+
+.api-key-bar button {
+  padding: 6px 12px;
+  border: 1px solid #6a6af0;
+  border-radius: 6px;
+  background: #4a4ae0;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.api-key-bar button:hover {
+  background: #5a5af0;
+}
+
+.api-key-bar button:disabled {
+  background: #3a3a6a;
+  border-color: #3a3a5a;
+  color: #8a8a9a;
+  cursor: not-allowed;
+}
+
+.bottom-bar {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #16213e;
+  border-top: 1px solid #2a2a4a;
+}
+
+.bottom-bar input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #3a3a5a;
+  border-radius: 6px;
+  background: #1a1a3e;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.bottom-bar input:focus {
+  outline: none;
+  border-color: #4a4ae0;
+}
+
+.bottom-bar .send-btn {
+  padding: 6px 14px;
+  border: 1px solid #6a6af0;
+  border-radius: 6px;
+  background: #4a4ae0;
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bottom-bar .send-btn:hover {
+  background: #5a5af0;
+}
+
+.bottom-bar .send-btn:disabled {
+  background: #3a3a6a;
+  border-color: #3a3a5a;
+  color: #8a8a9a;
+  cursor: not-allowed;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #6a6a8a;
+  text-align: center;
+  padding: 24px;
+}
+
+.empty-state h2 {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #8a8aaa;
+}
+
+.empty-state p {
+  font-size: 13px;
+  line-height: 1.5;
+}
