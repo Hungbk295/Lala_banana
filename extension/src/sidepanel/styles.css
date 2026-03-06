@@ -1,3 +1,37 @@
+/* ============================================
+   macOS-native design system
+   ============================================ */
+
+:root {
+  /* macOS system colors */
+  --macos-bg: #f5f5f7;
+  --macos-sidebar: rgba(246, 246, 246, 0.85);
+  --macos-toolbar: rgba(244, 244, 244, 0.92);
+  --macos-border: rgba(0, 0, 0, 0.09);
+  --macos-border-strong: rgba(0, 0, 0, 0.14);
+  --macos-text: #1d1d1f;
+  --macos-text-secondary: #6e6e73;
+  --macos-text-tertiary: #aeaeb2;
+  --macos-blue: #007aff;
+  --macos-blue-hover: #0071e3;
+  --macos-blue-active: #0064cc;
+  --macos-red: #ff3b30;
+  --macos-green: #34c759;
+  --macos-orange: #ff9500;
+  --macos-fill: rgba(120, 120, 128, 0.08);
+  --macos-fill-hover: rgba(120, 120, 128, 0.14);
+  --macos-fill-active: rgba(120, 120, 128, 0.2);
+  --macos-input-bg: #ffffff;
+  --macos-input-border: rgba(0, 0, 0, 0.1);
+  --macos-shadow-sm: 0 0.5px 1px rgba(0, 0, 0, 0.05);
+  --macos-shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 0.5px 1px rgba(0, 0, 0, 0.04);
+  --macos-shadow-lg: 0 4px 12px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.06);
+  --macos-radius: 8px;
+  --macos-radius-sm: 6px;
+  --macos-radius-lg: 10px;
+  --macos-transition: 180ms ease;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -5,11 +39,16 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #1a1a2e;
-  color: #e0e0e0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display',
+    'Helvetica Neue', Helvetica, Arial, sans-serif;
+  background: var(--macos-bg);
+  color: var(--macos-text);
   overflow: hidden;
   height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 #root {
@@ -24,68 +63,340 @@ body {
   height: 100vh;
 }
 
-.canvas-container {
-  flex: 1;
-  position: relative;
-  min-height: 0;
-}
+/* ============================================
+   Toolbar — macOS frosted glass bar
+   ============================================ */
 
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: #16213e;
-  border-bottom: 1px solid #2a2a4a;
+  gap: 4px;
+  padding: 8px 10px;
+  background: var(--macos-toolbar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--macos-border-strong);
   flex-wrap: wrap;
+  min-height: 44px;
 }
 
-.toolbar button {
-  padding: 6px 10px;
-  border: 1px solid #3a3a5a;
-  border-radius: 6px;
-  background: #1a1a3e;
-  color: #e0e0e0;
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: var(--macos-fill);
+  border-radius: var(--macos-radius-sm);
+  padding: 2px;
+}
+
+.toolbar-group .toolbar-btn {
+  border-radius: 4px;
+}
+
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: var(--macos-radius-sm);
+  background: transparent;
+  color: var(--macos-text);
   cursor: pointer;
   font-size: 12px;
-  transition: all 0.15s ease;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background var(--macos-transition), color var(--macos-transition),
+    box-shadow var(--macos-transition);
+  white-space: nowrap;
+  line-height: 1;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
-.toolbar button:hover {
-  background: #2a2a5e;
-  border-color: #5a5aaa;
+.toolbar-btn svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
 }
 
-.toolbar button.primary {
-  background: #4a4ae0;
-  border-color: #6a6af0;
-  color: white;
+.toolbar-btn:hover {
+  background: var(--macos-fill-hover);
+}
+
+.toolbar-btn:active {
+  background: var(--macos-fill-active);
+  transform: scale(0.97);
+}
+
+.toolbar-btn.icon-only {
+  padding: 6px;
+  width: 30px;
+  height: 30px;
+}
+
+.toolbar-btn.icon-only svg {
+  width: 16px;
+  height: 16px;
+}
+
+.toolbar-btn.danger {
+  color: var(--macos-red);
+}
+
+.toolbar-btn.danger:hover {
+  background: rgba(255, 59, 48, 0.1);
+}
+
+.toolbar-btn.success {
+  color: var(--macos-green);
+}
+
+.toolbar-btn.muted {
+  color: var(--macos-text-secondary);
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-divider {
+  width: 0.5px;
+  height: 18px;
+  background: var(--macos-border-strong);
+  margin: 0 4px;
+}
+
+/* ============================================
+   Canvas
+   ============================================ */
+
+.canvas-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  background: #ffffff;
+}
+
+/* ============================================
+   Bottom bar — macOS-style prompt bar
+   ============================================ */
+
+.bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--macos-toolbar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0.5px solid var(--macos-border-strong);
+}
+
+.bottom-bar .input-wrapper {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.bottom-bar .input-wrapper svg {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--macos-text-tertiary);
+  pointer-events: none;
+}
+
+.bottom-bar input {
+  width: 100%;
+  padding: 7px 10px 7px 32px;
+  border: 0.5px solid var(--macos-input-border);
+  border-radius: var(--macos-radius);
+  background: var(--macos-input-bg);
+  color: var(--macos-text);
+  font-size: 13px;
+  font-family: inherit;
+  box-shadow: var(--macos-shadow-sm);
+  transition: border-color var(--macos-transition), box-shadow var(--macos-transition);
+}
+
+.bottom-bar input::placeholder {
+  color: var(--macos-text-tertiary);
+}
+
+.bottom-bar input:focus {
+  outline: none;
+  border-color: var(--macos-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--macos-radius);
+  background: var(--macos-blue);
+  color: #ffffff;
+  font-size: 13px;
   font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--macos-transition), transform 80ms ease,
+    box-shadow var(--macos-transition);
+  box-shadow: var(--macos-shadow-sm);
+  line-height: 1;
 }
 
-.toolbar button.primary:hover {
-  background: #5a5af0;
+.send-btn svg {
+  width: 14px;
+  height: 14px;
 }
 
-.toolbar button.primary:disabled {
-  background: #3a3a6a;
-  border-color: #3a3a5a;
-  color: #8a8a9a;
+.send-btn:hover {
+  background: var(--macos-blue-hover);
+  box-shadow: var(--macos-shadow);
+}
+
+.send-btn:active {
+  background: var(--macos-blue-active);
+  transform: scale(0.97);
+}
+
+.send-btn:disabled {
+  background: rgba(0, 122, 255, 0.35);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.send-btn.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.send-btn.loading::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   API key bar — macOS settings inline
+   ============================================ */
+
+.api-key-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 149, 0, 0.06);
+  border-bottom: 0.5px solid rgba(255, 149, 0, 0.15);
+}
+
+.api-key-bar .key-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--macos-orange);
+  flex-shrink: 0;
+}
+
+.api-key-bar input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 0.5px solid var(--macos-input-border);
+  border-radius: var(--macos-radius-sm);
+  background: var(--macos-input-bg);
+  color: var(--macos-text);
+  font-size: 12px;
+  font-family: inherit;
+  box-shadow: var(--macos-shadow-sm);
+  transition: border-color var(--macos-transition), box-shadow var(--macos-transition);
+}
+
+.api-key-bar input::placeholder {
+  color: var(--macos-text-tertiary);
+}
+
+.api-key-bar input:focus {
+  outline: none;
+  border-color: var(--macos-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+}
+
+.api-key-bar button {
+  padding: 5px 14px;
+  border: none;
+  border-radius: var(--macos-radius-sm);
+  background: var(--macos-blue);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--macos-transition), transform 80ms ease;
+}
+
+.api-key-bar button:hover {
+  background: var(--macos-blue-hover);
+}
+
+.api-key-bar button:active {
+  background: var(--macos-blue-active);
+  transform: scale(0.97);
+}
+
+.api-key-bar button:disabled {
+  background: rgba(0, 122, 255, 0.35);
+  color: rgba(255, 255, 255, 0.6);
   cursor: not-allowed;
 }
 
-.toolbar .separator {
-  width: 1px;
-  height: 24px;
-  background: #3a3a5a;
-}
+/* ============================================
+   Result panel — macOS card style
+   ============================================ */
 
 .result-panel {
   max-height: 40vh;
   overflow-y: auto;
   padding: 12px;
-  background: #0f0f23;
-  border-top: 1px solid #2a2a4a;
+  background: #ffffff;
+  border-top: 0.5px solid var(--macos-border-strong);
+}
+
+.result-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.result-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.result-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+.result-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .result-header {
@@ -96,138 +407,108 @@ body {
 }
 
 .result-panel h3 {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #8a8aaa;
+  color: var(--macos-text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
   margin: 0;
 }
 
 .copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 3px 10px;
-  border: 1px solid #3a3a5a;
-  border-radius: 4px;
-  background: #1a1a3e;
-  color: #b0b0d0;
+  border: 0.5px solid var(--macos-border);
+  border-radius: var(--macos-radius-sm);
+  background: var(--macos-fill);
+  color: var(--macos-text-secondary);
   font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background var(--macos-transition), color var(--macos-transition);
+}
+
+.copy-btn svg {
+  width: 12px;
+  height: 12px;
 }
 
 .copy-btn:hover {
-  background: #2a2a5e;
-  border-color: #5a5aaa;
-  color: #e0e0f0;
+  background: var(--macos-fill-hover);
+  color: var(--macos-text);
+}
+
+.copy-btn:active {
+  background: var(--macos-fill-active);
+}
+
+.copy-btn.copied {
+  color: var(--macos-green);
+  border-color: rgba(52, 199, 89, 0.2);
+  background: rgba(52, 199, 89, 0.08);
 }
 
 .result-panel .response-text {
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.6;
   white-space: pre-wrap;
-  color: #d0d0e0;
+  color: var(--macos-text);
 }
 
 .result-panel .error-text {
-  color: #ff6b6b;
+  color: var(--macos-red);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .result-panel .loading {
-  color: #8a8aaa;
-  font-style: italic;
-}
-
-.api-key-bar {
   display: flex;
-  gap: 6px;
-  padding: 8px;
-  background: #0f0f23;
-  border-bottom: 1px solid #2a2a4a;
-}
-
-.api-key-bar input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #3a3a5a;
-  border-radius: 6px;
-  background: #1a1a3e;
-  color: #e0e0e0;
-  font-size: 12px;
-}
-
-.api-key-bar input:focus {
-  outline: none;
-  border-color: #4a4ae0;
-}
-
-.api-key-bar button {
-  padding: 6px 12px;
-  border: 1px solid #6a6af0;
-  border-radius: 6px;
-  background: #4a4ae0;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.api-key-bar button:hover {
-  background: #5a5af0;
-}
-
-.api-key-bar button:disabled {
-  background: #3a3a6a;
-  border-color: #3a3a5a;
-  color: #8a8a9a;
-  cursor: not-allowed;
-}
-
-.bottom-bar {
-  display: flex;
-  gap: 6px;
-  padding: 6px 8px;
-  background: #16213e;
-  border-top: 1px solid #2a2a4a;
-}
-
-.bottom-bar input {
-  flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #3a3a5a;
-  border-radius: 6px;
-  background: #1a1a3e;
-  color: #e0e0e0;
+  align-items: center;
+  gap: 8px;
+  color: var(--macos-text-secondary);
   font-size: 13px;
 }
 
-.bottom-bar input:focus {
-  outline: none;
-  border-color: #4a4ae0;
+.result-panel .loading-dots {
+  display: flex;
+  gap: 3px;
 }
 
-.bottom-bar .send-btn {
-  padding: 6px 14px;
-  border: 1px solid #6a6af0;
-  border-radius: 6px;
-  background: #4a4ae0;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
+.result-panel .loading-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--macos-blue);
+  animation: dot-pulse 1.2s ease-in-out infinite;
 }
 
-.bottom-bar .send-btn:hover {
-  background: #5a5af0;
+.result-panel .loading-dots span:nth-child(2) {
+  animation-delay: 0.15s;
 }
 
-.bottom-bar .send-btn:disabled {
-  background: #3a3a6a;
-  border-color: #3a3a5a;
-  color: #8a8a9a;
-  cursor: not-allowed;
+.result-panel .loading-dots span:nth-child(3) {
+  animation-delay: 0.3s;
 }
+
+@keyframes dot-pulse {
+  0%,
+  60%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ============================================
+   Empty state
+   ============================================ */
 
 .empty-state {
   display: flex;
@@ -235,18 +516,56 @@ body {
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6a6a8a;
+  color: var(--macos-text-tertiary);
   text-align: center;
   padding: 24px;
 }
 
 .empty-state h2 {
-  font-size: 16px;
-  margin-bottom: 8px;
-  color: #8a8aaa;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: var(--macos-text-secondary);
 }
 
 .empty-state p {
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
+}
+
+/* ============================================
+   Keyboard hint badge
+   ============================================ */
+
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--macos-fill);
+  border: 0.5px solid var(--macos-border);
+  font-size: 10px;
+  font-family: inherit;
+  color: var(--macos-text-tertiary);
+  line-height: 1.4;
+}
+
+/* ============================================
+   Tooltip
+   ============================================ */
+
+.toolbar-btn[title],
+.send-btn[title] {
+  position: relative;
+}
+
+/* ============================================
+   Reduced motion
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

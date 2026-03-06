@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Editor, TLShapeId } from 'tldraw';
 import { CanvasEditor } from './components/CanvasEditor';
 import { Toolbar } from './components/Toolbar';
 import { ResultPanel } from './components/ResultPanel';
-import { insertImageToCanvas, exportCanvasAsBase64, compressImage } from '../core/image-utils';
+import { insertImageToCanvas, exportCanvasAsBase64, compressImage, copyCanvasToClipboard } from '../core/image-utils';
 import { parseAnnotations } from '../core/annotation-parser';
 import { buildPrompt } from '../core/prompt-builder';
 import { getApiKey, setApiKey } from '../config/api-config';
@@ -20,6 +20,8 @@ export function App() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [hasApiKey, setHasApiKey] = useState(false);
   const [instruction, setInstruction] = useState('');
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [hasSelection, setHasSelection] = useState(false);
 
   // Check API key on mount
   useEffect(() => {
@@ -113,6 +115,17 @@ export function App() {
 
   const handleEditorReady = useCallback((editor: Editor) => {
     editorRef.current = editor;
+
+    // Track selection changes to show/hide delete button
+    const unsub = editor.store.listen(
+      () => {
+        const selectedIds = editor.getSelectedShapeIds();
+        setHasSelection(selectedIds.length > 0);
+      },
+      { source: 'user', scope: 'session' }
+    );
+
+    return () => unsub();
   }, []);
 
   const handlePaste = useCallback(
@@ -197,8 +210,47 @@ export function App() {
     }
   }, [imageShapeId, imageMeta, instruction]);
 
+  const handleCopyImage = useCallback(async () => {
+    if (!editorRef.current) return;
+    try {
+      await copyCanvasToClipboard(editorRef.current);
+      setCopyStatus('copied');
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    } catch {
+      setCopyStatus('error');
+      setTimeout(() => setCopyStatus('idle'), 2000);
+    }
+  }, []);
+
   const handleCapture = useCallback(() => {
     chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' });
+  }, []);
+
+  const handleDeleteSelected = useCallback(() => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    const selectedIds = editor.getSelectedShapeIds();
+    if (selectedIds.length === 0) return;
+
+    // Check if the tracked image shape is being deleted
+    if (imageShapeId && selectedIds.includes(imageShapeId)) {
+      setImageShapeId(null);
+      setImageMeta(null);
+    }
+
+    editor.deleteShapes(selectedIds);
+  }, [imageShapeId]);
+
+  const handleClearImage = useCallback(() => {
+    if (!editorRef.current) return;
+    const editor = editorRef.current;
+    // Delete all shapes on canvas
+    const allIds = [...editor.getCurrentPageShapeIds()];
+    editor.deleteShapes(allIds);
+    setImageShapeId(null);
+    setImageMeta(null);
+    setAiResponse(null);
+    setAiError(null);
   }, []);
 
   const handleSaveApiKey = useCallback(async () => {
@@ -222,15 +274,24 @@ export function App() {
     <div className="app-container">
       <Toolbar
         hasApiKey={hasApiKey}
+        hasImage={!!imageMeta}
+        hasSelection={hasSelection}
         onCapture={handleCapture}
+        onClearImage={handleClearImage}
+        onDeleteSelected={handleDeleteSelected}
         onSettings={() => setShowSettings(!showSettings)}
+        onCopyImage={handleCopyImage}
+        copyStatus={copyStatus}
       />
 
       {!hasApiKey && (
         <div className="api-key-bar">
+          <svg className="key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+          </svg>
           <input
             type="password"
-            placeholder="Paste OpenAI API key (sk-proj-...)"
+            placeholder="Paste API key to get started..."
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
             onKeyDown={(e) => {
@@ -240,16 +301,19 @@ export function App() {
             }}
           />
           <button onClick={handleSaveApiKey} disabled={!apiKeyInput.trim()}>
-            Save Key
+            Save
           </button>
         </div>
       )}
 
       {showSettings && hasApiKey && (
         <div className="api-key-bar">
+          <svg className="key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+          </svg>
           <input
             type="password"
-            placeholder="OpenAI API key"
+            placeholder="Update API key..."
             value={apiKeyInput}
             onChange={(e) => setApiKeyInput(e.target.value)}
             onKeyDown={(e) => {
@@ -269,20 +333,25 @@ export function App() {
       </div>
 
       <div className="bottom-bar">
-        <input
-          type="text"
-          placeholder="Describe what you want to change..."
-          value={instruction}
-          onChange={(e) => setInstruction(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-              e.preventDefault();
-              handleSend();
-            }
-          }}
-        />
+        <div className="input-wrapper">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Describe what to change..."
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+          />
+        </div>
         <button
-          className="send-btn"
+          className={`send-btn ${loading ? 'loading' : ''}`}
           onClick={handleSend}
           disabled={!imageMeta || !hasApiKey || loading}
           title={
@@ -290,10 +359,18 @@ export function App() {
               ? 'Set API key first'
               : !imageMeta
                 ? 'Load an image first (right-click or paste)'
-                : 'Send to AI (Cmd+Enter)'
+                : 'Send to AI (⌘↵)'
           }
         >
-          {loading ? 'Sending...' : 'Send'}
+          {loading ? '' : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+              Send
+            </>
+          )}
         </button>
       </div>
 

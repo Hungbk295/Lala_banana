@@ -57,7 +57,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 export async function insertImageToCanvas(
   editor: Editor,
-  imageUrl: string,
+  _imageUrl: string,
   blob: Blob
 ): Promise<TLShapeId> {
   // Convert blob to data URL — tldraw v4 rejects blob: protocol URLs
@@ -78,8 +78,15 @@ export async function insertImageToCanvas(
 
   const w = img.width * scale;
   const h = img.height * scale;
-  const x = (viewport.width - w) / 2;
-  const y = (viewport.height - h) / 2;
+
+  // Offset new images so they don't stack on top of each other
+  const existingImages = editor
+    .getCurrentPageShapes()
+    .filter((s) => s.type === 'image');
+  const offset = existingImages.length * 30;
+
+  const x = (viewport.width - w) / 2 + offset;
+  const y = (viewport.height - h) / 2 + offset;
 
   const assetId = AssetRecordType.createId();
   editor.createAssets([
@@ -112,12 +119,6 @@ export async function insertImageToCanvas(
     },
   });
 
-  editor.updateShape({
-    id: shapeId,
-    type: 'image',
-    isLocked: true,
-  });
-
   return shapeId;
 }
 
@@ -140,6 +141,20 @@ export async function exportCanvasAsBase64(
     };
     reader.readAsDataURL(blob.blob);
   });
+}
+
+export async function copyCanvasToClipboard(editor: Editor): Promise<void> {
+  const shapeIds = editor.getCurrentPageShapeIds();
+  if (shapeIds.size === 0) throw new Error('No content to copy');
+
+  const result = await editor.toImage([...shapeIds], {
+    format: 'png',
+    background: true,
+  });
+
+  await navigator.clipboard.write([
+    new ClipboardItem({ 'image/png': result.blob }),
+  ]);
 }
 
 export async function cropHighlightRegion(
