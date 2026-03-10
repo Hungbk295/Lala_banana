@@ -49,10 +49,16 @@ export interface APIRequest {
   prompt: string;
 }
 
+export interface GeminiResponse {
+  text?: string;
+  images?: string[]; // Generated image URLs
+}
+
 export type MessageType =
   | { type: 'IMAGE_FROM_CONTEXT_MENU'; payload: ContextMenuPayload }
   | { type: 'IMAGE_CAPTURED'; dataUrl: string }
   | { type: 'CAPTURE_TAB' }
   | { type: 'SEND_TO_AI'; payload: APIRequest }
-  | { type: 'AI_RESPONSE'; payload: { text: string } }
+  | { type: 'SEND_TO_GEMINI'; payload: APIRequest }
+  | { type: 'AI_RESPONSE'; payload: { text?: string; images?: string[] } }
   | { type: 'AI_ERROR'; payload: { error: string } };

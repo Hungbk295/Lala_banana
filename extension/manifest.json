@@ -8,12 +8,16 @@
     "storage",
     "sidePanel",
     "contextMenus",
-    "clipboardWrite"
+    "clipboardWrite",
+    "cookies",
+    "declarativeNetRequest"
   ],
   "host_permissions": [
     "https://lh3.googleusercontent.com/*",
     "https://*.blob.core.windows.net/*",
     "https://api.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://push.clients6.google.com/*",
     "<all_urls>"
   ],
   "side_panel": {

@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 interface ResultPanelProps {
   loading: boolean;
   response: string | null;
+  images?: string[];
   error: string | null;
 }
 
@@ -19,7 +20,7 @@ const CheckIcon = () => (
   </svg>
 );
 
-export function ResultPanel({ loading, response, error }: ResultPanelProps) {
+export function ResultPanel({ loading, response, images, error }: ResultPanelProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -28,6 +29,8 @@ export function ResultPanel({ loading, response, error }: ResultPanelProps) {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [response]);
+
+  const hasImages = images && images.length > 0;
 
   return (
     <div className="result-panel">
@@ -51,6 +54,15 @@ export function ResultPanel({ loading, response, error }: ResultPanelProps) {
         </p>
       )}
       {error && <p className="error-text">{error}</p>}
+      {hasImages && (
+        <div className="image-grid">
+          {images.map((url, i) => (
+            <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="image-thumb">
+              <img src={url} alt={`Generated ${i + 1}`} />
+            </a>
+          ))}
+        </div>
+      )}
       {response && <p className="response-text">{response}</p>}
     </div>
   );

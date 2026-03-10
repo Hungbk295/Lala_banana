@@ -1,12 +1,53 @@
 import { fetchImageAsBase64 } from './image-fetcher';
 import { sendToAI } from './api-client';
+import { sendToGemini } from './gemini-client';
 
-// Create context menu on install
-chrome.runtime.onInstalled.addListener(() => {
+// Create context menu + set up header rules on install
+chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: 'annotate-image',
     title: 'Edit with AI Annotation',
     contexts: ['image'],
+  });
+
+  // Fix Origin/Referer/Sec-Fetch-Site for Gemini API requests
+  // Chrome sets origin to chrome-extension:// which Google servers reject
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [100, 101],
+    addRules: [
+      {
+        id: 100,
+        priority: 1,
+        action: {
+          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+          requestHeaders: [
+            { header: 'Origin', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://gemini.google.com' },
+            { header: 'Referer', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://gemini.google.com/' },
+            { header: 'Sec-Fetch-Site', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'same-site' },
+          ],
+        },
+        condition: {
+          urlFilter: '||push.clients6.google.com/upload',
+          resourceTypes: [chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST],
+        },
+      },
+      {
+        id: 101,
+        priority: 1,
+        action: {
+          type: chrome.declarativeNetRequest.RuleActionType.MODIFY_HEADERS,
+          requestHeaders: [
+            { header: 'Origin', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://gemini.google.com' },
+            { header: 'Referer', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'https://gemini.google.com/' },
+            { header: 'Sec-Fetch-Site', operation: chrome.declarativeNetRequest.HeaderOperation.SET, value: 'same-origin' },
+          ],
+        },
+        condition: {
+          urlFilter: '||gemini.google.com/_/BardChatUi',
+          resourceTypes: [chrome.declarativeNetRequest.ResourceType.XMLHTTPREQUEST],
+        },
+      },
+    ],
   });
 });
 
@@ -90,6 +131,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           payload: { error: err.message },
         });
       });
-    return true; // Keep channel open for async response
+    return true;
+  }
+
+  if (message.type === 'SEND_TO_GEMINI') {
+    sendToGemini(message.payload)
+      .then((result) => {
+        sendResponse({ type: 'AI_RESPONSE', payload: result });
+      })
+      .catch((err) => {
+        sendResponse({
+          type: 'AI_ERROR',
+          payload: { error: err.message },
+        });
+      });
+    return true;
   }
 });

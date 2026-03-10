@@ -1,5 +1,15 @@
 {
   "mcpServers": {
+    "maestro-status": {
+      "args": [],
+      "command": "/Users/jc/Documents/Sth/JCSpace/maestro/target/debug/maestro-mcp-server",
+      "env": {
+        "MAESTRO_INSTANCE_ID": "2fb404bb-93ee-46ff-a5bd-45e86598d61b",
+        "MAESTRO_SESSION_ID": "3",
+        "MAESTRO_STATUS_URL": "http://127.0.0.1:9901/status"
+      },
+      "type": "stdio"
+    },
     "pencil": {
       "args": [
         "--app",

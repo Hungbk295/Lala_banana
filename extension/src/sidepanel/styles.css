@@ -233,6 +233,62 @@ body {
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
 }
 
+.gemini-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: 0.5px solid rgba(168, 85, 247, 0.3);
+  border-radius: var(--macos-radius);
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.08), rgba(168, 85, 247, 0.08));
+  color: #7c3aed;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--macos-transition), transform 80ms ease,
+    box-shadow var(--macos-transition), border-color var(--macos-transition);
+  line-height: 1;
+}
+
+.gemini-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.gemini-btn:hover {
+  background: linear-gradient(135deg, rgba(66, 133, 244, 0.15), rgba(168, 85, 247, 0.15));
+  border-color: rgba(168, 85, 247, 0.5);
+  box-shadow: var(--macos-shadow-sm);
+}
+
+.gemini-btn:active {
+  transform: scale(0.97);
+}
+
+.gemini-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.gemini-btn.loading {
+  position: relative;
+  pointer-events: none;
+}
+
+.gemini-btn.loading::after {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(168, 85, 247, 0.3);
+  border-top-color: #7c3aed;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
 .send-btn {
   display: inline-flex;
   align-items: center;
@@ -449,6 +505,32 @@ body {
   color: var(--macos-green);
   border-color: rgba(52, 199, 89, 0.2);
   background: rgba(52, 199, 89, 0.08);
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.image-thumb {
+  display: block;
+  border-radius: var(--macos-radius);
+  overflow: hidden;
+  border: 0.5px solid var(--macos-border);
+  transition: box-shadow var(--macos-transition), transform 80ms ease;
+}
+
+.image-thumb:hover {
+  box-shadow: var(--macos-shadow-lg);
+  transform: scale(1.02);
+}
+
+.image-thumb img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 .result-panel .response-text {

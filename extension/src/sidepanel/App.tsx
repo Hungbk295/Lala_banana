@@ -14,6 +14,7 @@ export function App() {
   const [imageMeta, setImageMeta] = useState<ImageMeta | null>(null);
   const [imageShapeId, setImageShapeId] = useState<TLShapeId | null>(null);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [aiImages, setAiImages] = useState<string[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -174,11 +175,12 @@ export function App() {
     return () => window.removeEventListener('paste', handlePaste);
   }, [handlePaste]);
 
-  const handleSend = useCallback(async () => {
+  const doSend = useCallback(async (target: 'SEND_TO_AI' | 'SEND_TO_GEMINI') => {
     if (!editorRef.current || !imageShapeId || !imageMeta) return;
 
     setLoading(true);
     setAiResponse(null);
+    setAiImages([]);
     setAiError(null);
 
     try {
@@ -186,20 +188,19 @@ export function App() {
       const prompt = buildPrompt(annotations, instruction || undefined);
       const annotatedImage = await exportCanvasAsBase64(editorRef.current);
 
-      // Get original image base64
       let originalImage = imageMeta.base64 || '';
       if (!originalImage && imageMeta.objectUrl) {
-        // objectUrl is already a data URL
         originalImage = imageMeta.objectUrl.split(',')[1] || '';
       }
 
       const response = await chrome.runtime.sendMessage({
-        type: 'SEND_TO_AI',
+        type: target,
         payload: { originalImage, annotatedImage, prompt },
       });
 
       if (response.type === 'AI_RESPONSE') {
-        setAiResponse(response.payload.text);
+        if (response.payload.text) setAiResponse(response.payload.text);
+        if (response.payload.images?.length) setAiImages(response.payload.images);
       } else if (response.type === 'AI_ERROR') {
         setAiError(response.payload.error);
       }
@@ -209,6 +210,9 @@ export function App() {
       setLoading(false);
     }
   }, [imageShapeId, imageMeta, instruction]);
+
+  const handleSend = useCallback(() => doSend('SEND_TO_AI'), [doSend]);
+  const handleSendGemini = useCallback(() => doSend('SEND_TO_GEMINI'), [doSend]);
 
   const handleCopyImage = useCallback(async () => {
     if (!editorRef.current) return;
@@ -250,6 +254,7 @@ export function App() {
     setImageShapeId(null);
     setImageMeta(null);
     setAiResponse(null);
+    setAiImages([]);
     setAiError(null);
   }, []);
 
@@ -351,6 +356,23 @@ export function App() {
           />
         </div>
         <button
+          className={`gemini-btn ${loading ? 'loading' : ''}`}
+          onClick={handleSendGemini}
+          disabled={!imageMeta || loading}
+          title={!imageMeta ? 'Load an image first' : 'Send to Gemini (uses browser cookies)'}
+        >
+          {loading ? '' : (
+            <>
+              <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="url(#gemGrad)" opacity="0.15"/>
+                <path d="M12 2v20M2 12h20M5.64 5.64l12.73 12.73M18.36 5.64L5.64 18.36" stroke="url(#gemGrad)" strokeWidth="1.5"/>
+                <defs><linearGradient id="gemGrad" x1="0" y1="0" x2="24" y2="24"><stop stopColor="#4285F4"/><stop offset="1" stopColor="#A855F7"/></linearGradient></defs>
+              </svg>
+              Gemini
+            </>
+          )}
+        </button>
+        <button
           className={`send-btn ${loading ? 'loading' : ''}`}
           onClick={handleSend}
           disabled={!imageMeta || !hasApiKey || loading}
@@ -374,10 +396,11 @@ export function App() {
         </button>
       </div>
 
-      {(loading || aiResponse || aiError) && (
+      {(loading || aiResponse || aiImages.length > 0 || aiError) && (
         <ResultPanel
           loading={loading}
           response={aiResponse}
+          images={aiImages}
           error={aiError}
         />
       )}
