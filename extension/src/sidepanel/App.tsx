@@ -3,7 +3,7 @@ import type { Editor, TLShapeId } from 'tldraw';
 import { CanvasEditor } from './components/CanvasEditor';
 import { Toolbar } from './components/Toolbar';
 import { ResultPanel } from './components/ResultPanel';
-import { insertImageToCanvas, exportCanvasAsBase64, compressImage, copyCanvasToClipboard } from '../core/image-utils';
+import { insertImageToCanvas, exportCanvasAsBase64, compressImage, copyCanvasToClipboard, base64ToBlob, removeBackground as removeImageBg } from '../core/image-utils';
 import { parseAnnotations } from '../core/annotation-parser';
 import { buildPrompt } from '../core/prompt-builder';
 import { getApiKey, setApiKey } from '../config/api-config';
@@ -22,6 +22,7 @@ export function App() {
   const [instruction, setInstruction] = useState('');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [hasSelection, setHasSelection] = useState(false);
+  const [removeBgLoading, setRemoveBgLoading] = useState(false);
 
   // Check API key on mount
   useEffect(() => {
@@ -222,6 +223,104 @@ export function App() {
     }
   }, []);
 
+  const handleRemoveBg = useCallback(async () => {
+    const editor = editorRef.current;
+    if (!editor || !imageShapeId || !imageMeta) return;
+
+    const imageShape = editor.getShape(imageShapeId);
+    if (!imageShape) return;
+
+    const imgProps = (imageShape as any).props;
+    let croppedBase64: string;
+    let cropMimeType = 'image/jpeg';
+
+    // Check if user selected a geo shape (rectangle/ellipse) to crop region
+    const selectedIds = editor.getSelectedShapeIds();
+    const selectedGeo = selectedIds.length > 0
+      ? selectedIds
+          .map((id) => editor.getShape(id))
+          .find((s) => s && s.type === 'geo' && s.id !== imageShapeId)
+      : null;
+
+    if (selectedGeo) {
+      // Crop the selected region from original image
+      const geoProps = (selectedGeo as any).props;
+      const relX = Math.max(0, (selectedGeo.x - imageShape.x) / imgProps.w);
+      const relY = Math.max(0, (selectedGeo.y - imageShape.y) / imgProps.h);
+      const relW = Math.min(1 - relX, geoProps.w / imgProps.w);
+      const relH = Math.min(1 - relY, geoProps.h / imgProps.h);
+
+      // Load original image to crop
+      const img = new Image();
+      img.src = imageMeta.objectUrl;
+      await new Promise((r) => { img.onload = r; });
+
+      const canvas = document.createElement('canvas');
+      const sx = relX * img.naturalWidth;
+      const sy = relY * img.naturalHeight;
+      const sw = relW * img.naturalWidth;
+      const sh = relH * img.naturalHeight;
+      canvas.width = Math.max(1, Math.round(sw));
+      canvas.height = Math.max(1, Math.round(sh));
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      croppedBase64 = canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
+    } else {
+      // Use full original image
+      croppedBase64 = imageMeta.base64 || imageMeta.objectUrl.split(',')[1] || '';
+    }
+
+    if (!croppedBase64) return;
+
+    setRemoveBgLoading(true);
+    setAiError(null);
+
+    try {
+      const response = await new Promise<any>((resolve, reject) => {
+        chrome.runtime.sendMessage(
+          {
+            type: 'REMOVE_BG',
+            payload: {
+              imageBase64: croppedBase64,
+              mimeType: cropMimeType,
+              prompt: instruction || undefined,
+            },
+          },
+          (resp) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+            } else {
+              resolve(resp);
+            }
+          }
+        );
+      });
+
+      if (response.type === 'REMOVE_BG_RESULT') {
+        // Chroma-key background → real alpha transparency
+        const processed = await removeImageBg(
+          response.payload.imageBase64,
+          response.payload.mimeType
+        );
+        const resultDataUrl = `data:${processed.mimeType};base64,${processed.base64}`;
+        const blob = base64ToBlob(processed.base64, processed.mimeType);
+
+        // Insert result image into canvas
+        await insertImageToCanvas(editor, resultDataUrl, blob);
+
+        if (response.payload.text) {
+          setAiResponse(response.payload.text);
+        }
+      } else if (response.type === 'REMOVE_BG_ERROR') {
+        setAiError(response.payload.error);
+      }
+    } catch (err: any) {
+      setAiError(err.message || 'Remove BG failed');
+    } finally {
+      setRemoveBgLoading(false);
+    }
+  }, [imageShapeId, imageMeta, instruction]);
+
   const handleCapture = useCallback(() => {
     chrome.runtime.sendMessage({ type: 'CAPTURE_TAB' });
   }, []);
@@ -276,11 +375,13 @@ export function App() {
         hasApiKey={hasApiKey}
         hasImage={!!imageMeta}
         hasSelection={hasSelection}
+        removeBgLoading={removeBgLoading}
         onCapture={handleCapture}
         onClearImage={handleClearImage}
         onDeleteSelected={handleDeleteSelected}
         onSettings={() => setShowSettings(!showSettings)}
         onCopyImage={handleCopyImage}
+        onRemoveBg={handleRemoveBg}
         copyStatus={copyStatus}
       />
 

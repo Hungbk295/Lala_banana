@@ -3,11 +3,13 @@ interface ToolbarProps {
   hasApiKey: boolean;
   hasImage: boolean;
   hasSelection: boolean;
+  removeBgLoading: boolean;
   onCapture: () => void;
   onSettings: () => void;
   onClearImage: () => void;
   onCopyImage: () => void;
   onDeleteSelected: () => void;
+  onRemoveBg: () => void;
   copyStatus: 'idle' | 'copied' | 'error';
 }
 
@@ -67,15 +69,27 @@ const DeleteIcon = () => (
   </svg>
 );
 
+const ScissorsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="6" cy="6" r="3" />
+    <circle cx="6" cy="18" r="3" />
+    <line x1="20" y1="4" x2="8.12" y2="15.88" />
+    <line x1="14.47" y1="14.48" x2="20" y2="20" />
+    <line x1="8.12" y1="8.12" x2="12" y2="12" />
+  </svg>
+);
+
 export function Toolbar({
   hasApiKey,
   hasImage,
   hasSelection,
+  removeBgLoading,
   onCapture,
   onSettings,
   onClearImage,
   onCopyImage,
   onDeleteSelected,
+  onRemoveBg,
   copyStatus,
 }: ToolbarProps) {
   const getCopyContent = () => {
@@ -112,6 +126,16 @@ export function Toolbar({
 
         {hasImage && (
           <>
+            <button
+              className={`toolbar-btn ${removeBgLoading ? 'loading' : ''}`}
+              onClick={onRemoveBg}
+              disabled={removeBgLoading}
+              title={hasSelection ? 'Remove background from selected region' : 'Remove background from image'}
+            >
+              <ScissorsIcon />
+              <span>{removeBgLoading ? '...' : 'Remove BG'}</span>
+            </button>
+
             <button
               className={copy.className}
               onClick={onCopyImage}

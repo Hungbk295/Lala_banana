@@ -176,6 +176,89 @@ export async function cropHighlightRegion(
   return canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
 }
 
+/**
+ * Remove solid-color background via chroma keying.
+ * Works for green screen (#00FF00), checkerboard grays, or any dominant bg color.
+ * Auto-detects the background color by sampling corners.
+ */
+export async function removeBackground(
+  base64: string,
+  mimeType: string
+): Promise<{ base64: string; mimeType: string }> {
+  const img = new Image();
+  img.src = `data:${mimeType};base64,${base64}`;
+  await new Promise((r) => { img.onload = r; });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = imageData.data;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Sample corners to detect background color
+  const corners = [
+    0,                          // top-left
+    (w - 1) * 4,               // top-right
+    (h - 1) * w * 4,           // bottom-left
+    ((h - 1) * w + w - 1) * 4, // bottom-right
+  ];
+
+  // Find most common corner color (majority vote)
+  const samples = corners.map((i) => ({ r: d[i], g: d[i + 1], b: d[i + 2] }));
+  let bgColor = samples[0];
+  let bestCount = 0;
+  for (const s of samples) {
+    const count = samples.filter(
+      (o) => Math.abs(o.r - s.r) + Math.abs(o.g - s.g) + Math.abs(o.b - s.b) < 40
+    ).length;
+    if (count > bestCount) {
+      bestCount = count;
+      bgColor = s;
+    }
+  }
+
+  // Need at least 2 corners matching to be confident
+  if (bestCount < 2) return { base64, mimeType };
+
+  // Check if it's green screen (#00FF00 area)
+  const isGreenScreen = bgColor.g > 200 && bgColor.r < 100 && bgColor.b < 100;
+
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+
+    if (isGreenScreen) {
+      // Green screen keying with edge feathering
+      const greenDom = g - Math.max(r, b);
+      if (greenDom > 80) {
+        d[i + 3] = 0;
+      } else if (greenDom > 30) {
+        d[i + 3] = Math.round(255 * (1 - (greenDom - 30) / 50));
+        // Remove green spill from edge pixels
+        d[i + 1] = Math.min(g, Math.max(r, b));
+      }
+    } else {
+      // Generic color keying (for checkerboard grays, white bg, etc.)
+      const dist = Math.abs(r - bgColor.r) + Math.abs(g - bgColor.g) + Math.abs(b - bgColor.b);
+      if (dist < 30) {
+        d[i + 3] = 0;
+      } else if (dist < 60) {
+        d[i + 3] = Math.round(255 * ((dist - 30) / 30));
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+  return {
+    base64: canvas.toDataURL('image/png').split(',')[1],
+    mimeType: 'image/png',
+  };
+}
+
 export function base64ToBlob(base64: string, mimeType = 'image/jpeg'): Blob {
   const byteChars = atob(base64);
   const byteNumbers = new Array(byteChars.length);

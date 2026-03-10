@@ -1,5 +1,6 @@
 import { fetchImageAsBase64 } from './image-fetcher';
 import { sendToAI } from './api-client';
+import { removeBackground } from './gemini-client';
 
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -90,6 +91,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           payload: { error: err.message },
         });
       });
-    return true; // Keep channel open for async response
+    return true;
+  }
+
+  if (message.type === 'REMOVE_BG') {
+    const { imageBase64, mimeType, prompt } = message.payload;
+    removeBackground(imageBase64, mimeType, prompt)
+      .then((result) => {
+        sendResponse({ type: 'REMOVE_BG_RESULT', payload: result });
+      })
+      .catch((err) => {
+        sendResponse({
+          type: 'REMOVE_BG_ERROR',
+          payload: { error: err.message },
+        });
+      });
+    return true;
   }
 });

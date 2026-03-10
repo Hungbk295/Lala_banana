@@ -157,6 +157,21 @@ body {
   color: var(--macos-text-secondary);
 }
 
+.toolbar-btn.loading {
+  color: var(--macos-blue);
+  pointer-events: none;
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.toolbar-btn:disabled:hover {
+  background: transparent;
+}
+
 .toolbar-spacer {
   flex: 1;
 }
@@ -378,8 +393,9 @@ body {
   max-height: 40vh;
   overflow-y: auto;
   padding: 12px;
-  background: #ffffff;
+  background: var(--macos-bg);
   border-top: 0.5px solid var(--macos-border-strong);
+  color: var(--macos-text);
 }
 
 .result-panel::-webkit-scrollbar {
@@ -453,7 +469,7 @@ body {
 
 .result-panel .response-text {
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   white-space: pre-wrap;
   color: var(--macos-text);
 }

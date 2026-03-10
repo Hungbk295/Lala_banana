@@ -49,10 +49,25 @@ export interface APIRequest {
   prompt: string;
 }
 
+export interface RemoveBgRequest {
+  imageBase64: string;
+  mimeType: string;
+  prompt?: string;
+}
+
+export interface RemoveBgResult {
+  imageBase64: string;
+  mimeType: string;
+  text?: string;
+}
+
 export type MessageType =
   | { type: 'IMAGE_FROM_CONTEXT_MENU'; payload: ContextMenuPayload }
   | { type: 'IMAGE_CAPTURED'; dataUrl: string }
   | { type: 'CAPTURE_TAB' }
   | { type: 'SEND_TO_AI'; payload: APIRequest }
   | { type: 'AI_RESPONSE'; payload: { text: string } }
-  | { type: 'AI_ERROR'; payload: { error: string } };
+  | { type: 'AI_ERROR'; payload: { error: string } }
+  | { type: 'REMOVE_BG'; payload: RemoveBgRequest }
+  | { type: 'REMOVE_BG_RESULT'; payload: RemoveBgResult }
+  | { type: 'REMOVE_BG_ERROR'; payload: { error: string } };
