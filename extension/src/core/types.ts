@@ -49,10 +49,24 @@ export interface APIRequest {
   prompt: string;
 }
 
+export interface GeminiPart {
+  text?: string;
+  inlineData?: {
+    mimeType: string;
+    data: string;
+  };
+}
+
+export interface AIResponsePart {
+  type: 'text' | 'image';
+  content: string;
+  mimeType?: string;
+}
+
 export type MessageType =
   | { type: 'IMAGE_FROM_CONTEXT_MENU'; payload: ContextMenuPayload }
   | { type: 'IMAGE_CAPTURED'; dataUrl: string }
   | { type: 'CAPTURE_TAB' }
-  | { type: 'SEND_TO_AI'; payload: APIRequest }
-  | { type: 'AI_RESPONSE'; payload: { text: string } }
+  | { type: 'SEND_TO_GEMINI'; payload: APIRequest }
+  | { type: 'GEMINI_RESPONSE'; payload: { parts: AIResponsePart[] } }
   | { type: 'AI_ERROR'; payload: { error: string } };

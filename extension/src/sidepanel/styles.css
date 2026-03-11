@@ -299,53 +299,35 @@ body {
 }
 
 /* ============================================
-   API key bar — macOS settings inline
+   Auth bar — Google sign-in prompt
    ============================================ */
 
-.api-key-bar {
+.auth-bar {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 10px;
-  background: rgba(255, 149, 0, 0.06);
-  border-bottom: 0.5px solid rgba(255, 149, 0, 0.15);
+  background: rgba(66, 133, 244, 0.06);
+  border-bottom: 0.5px solid rgba(66, 133, 244, 0.15);
 }
 
-.api-key-bar .key-icon {
-  width: 14px;
-  height: 14px;
-  color: var(--macos-orange);
+.auth-bar .google-icon {
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
 }
 
-.api-key-bar input {
+.auth-bar .auth-text {
   flex: 1;
-  padding: 6px 10px;
-  border: 0.5px solid var(--macos-input-border);
-  border-radius: var(--macos-radius-sm);
-  background: var(--macos-input-bg);
-  color: var(--macos-text);
   font-size: 12px;
-  font-family: inherit;
-  box-shadow: var(--macos-shadow-sm);
-  transition: border-color var(--macos-transition), box-shadow var(--macos-transition);
+  color: var(--macos-text-secondary);
 }
 
-.api-key-bar input::placeholder {
-  color: var(--macos-text-tertiary);
-}
-
-.api-key-bar input:focus {
-  outline: none;
-  border-color: var(--macos-blue);
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
-}
-
-.api-key-bar button {
+.google-login-btn {
   padding: 5px 14px;
   border: none;
   border-radius: var(--macos-radius-sm);
-  background: var(--macos-blue);
+  background: #4285f4;
   color: #ffffff;
   font-size: 12px;
   font-weight: 600;
@@ -355,19 +337,65 @@ body {
   transition: background var(--macos-transition), transform 80ms ease;
 }
 
-.api-key-bar button:hover {
-  background: var(--macos-blue-hover);
+.google-login-btn:hover {
+  background: #3367d6;
 }
 
-.api-key-bar button:active {
-  background: var(--macos-blue-active);
+.google-login-btn:active {
+  background: #2a56c6;
   transform: scale(0.97);
 }
 
-.api-key-bar button:disabled {
-  background: rgba(0, 122, 255, 0.35);
+.google-login-btn:disabled {
+  background: rgba(66, 133, 244, 0.45);
   color: rgba(255, 255, 255, 0.6);
   cursor: not-allowed;
+}
+
+/* Toolbar Google sign-in button */
+.toolbar-btn.google-btn {
+  color: var(--macos-text);
+}
+
+.toolbar-btn.google-btn .google-icon-sm {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* Toolbar user info (logged in) */
+.toolbar-btn.user-btn {
+  gap: 6px;
+  padding: 4px 8px;
+}
+
+.user-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.user-avatar-placeholder {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--macos-blue);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.user-email {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--macos-text-secondary);
 }
 
 /* ============================================
@@ -456,6 +484,51 @@ body {
   line-height: 1.6;
   white-space: pre-wrap;
   color: var(--macos-text);
+}
+
+.response-image-container {
+  margin: 8px 0;
+  border-radius: var(--macos-radius);
+  overflow: hidden;
+  border: 0.5px solid var(--macos-border);
+  background: var(--macos-fill);
+}
+
+.response-image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.load-to-canvas-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-top: 0.5px solid var(--macos-border);
+  background: var(--macos-fill);
+  color: var(--macos-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--macos-transition);
+}
+
+.load-to-canvas-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.load-to-canvas-btn:hover {
+  background: var(--macos-fill-hover);
+}
+
+.load-to-canvas-btn:active {
+  background: var(--macos-fill-active);
 }
 
 .result-panel .error-text {

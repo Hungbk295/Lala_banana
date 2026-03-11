@@ -6,30 +6,18 @@ import { ResultPanel } from './components/ResultPanel';
 import { insertImageToCanvas, exportCanvasAsBase64, compressImage, copyCanvasToClipboard } from '../core/image-utils';
 import { parseAnnotations } from '../core/annotation-parser';
 import { buildPrompt } from '../core/prompt-builder';
-import { getApiKey, setApiKey } from '../config/api-config';
-import type { ImageMeta } from '../core/types';
+import type { ImageMeta, AIResponsePart } from '../core/types';
 
 export function App() {
   const editorRef = useRef<Editor | null>(null);
   const [imageMeta, setImageMeta] = useState<ImageMeta | null>(null);
   const [imageShapeId, setImageShapeId] = useState<TLShapeId | null>(null);
-  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [responseParts, setResponseParts] = useState<AIResponsePart[]>([]);
   const [aiError, setAiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKeyInput, setApiKeyInput] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [instruction, setInstruction] = useState('');
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle');
   const [hasSelection, setHasSelection] = useState(false);
-
-  // Check API key on mount
-  useEffect(() => {
-    getApiKey().then((key) => {
-      setHasApiKey(!!key);
-      if (key) setApiKeyInput(key);
-    });
-  }, []);
 
   // Load image from URL (fetches via service worker to bypass CORS)
   const loadImageFromUrl = useCallback(
@@ -37,7 +25,6 @@ export function App() {
       if (!editorRef.current) return;
 
       try {
-        // Fetch image via service worker (bypass CORS)
         const response = await new Promise<{ base64: string; mimeType: string }>((resolve, reject) => {
           chrome.runtime.sendMessage(
             { type: 'FETCH_IMAGE', payload: { url: srcUrl } },
@@ -51,7 +38,6 @@ export function App() {
         const { base64, mimeType } = response;
         const dataUrl = `data:${mimeType};base64,${base64}`;
 
-        // Create blob for insertImageToCanvas
         const byteChars = atob(base64);
         const byteArray = new Uint8Array(byteChars.length);
         for (let i = 0; i < byteChars.length; i++) {
@@ -61,11 +47,7 @@ export function App() {
 
         setImageMeta({ sourceUrl: srcUrl, objectUrl: dataUrl, base64 });
 
-        const shapeId = await insertImageToCanvas(
-          editorRef.current,
-          dataUrl,
-          blob
-        );
+        const shapeId = await insertImageToCanvas(editorRef.current, dataUrl, blob);
         setImageShapeId(shapeId);
       } catch (err) {
         console.error('Failed to load image:', err);
@@ -81,7 +63,6 @@ export function App() {
         loadImageFromUrl(message.payload.srcUrl);
       }
       if (message.type === 'IMAGE_CAPTURED') {
-        // Data URL from tab capture — extract base64 and load
         const base64 = message.dataUrl.split(',')[1];
         const blob = new Blob(
           [Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))],
@@ -116,7 +97,6 @@ export function App() {
   const handleEditorReady = useCallback((editor: Editor) => {
     editorRef.current = editor;
 
-    // Track selection changes to show/hide delete button
     const unsub = editor.store.listen(
       () => {
         const selectedIds = editor.getSelectedShapeIds();
@@ -145,7 +125,6 @@ export function App() {
             quality: 0.85,
           });
 
-          // Read as data URL for tldraw compatibility
           const dataUrl = await new Promise<string>((resolve) => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
@@ -155,11 +134,7 @@ export function App() {
           setImageMeta({ sourceUrl: 'clipboard', objectUrl: dataUrl });
 
           if (editorRef.current) {
-            const shapeId = await insertImageToCanvas(
-              editorRef.current,
-              dataUrl,
-              compressed
-            );
+            const shapeId = await insertImageToCanvas(editorRef.current, dataUrl, compressed);
             setImageShapeId(shapeId);
           }
           break;
@@ -174,11 +149,12 @@ export function App() {
     return () => window.removeEventListener('paste', handlePaste);
   }, [handlePaste]);
 
+  // Send to Gemini via proxy
   const handleSend = useCallback(async () => {
     if (!editorRef.current || !imageShapeId || !imageMeta) return;
 
     setLoading(true);
-    setAiResponse(null);
+    setResponseParts([]);
     setAiError(null);
 
     try {
@@ -186,20 +162,20 @@ export function App() {
       const prompt = buildPrompt(annotations, instruction || undefined);
       const annotatedImage = await exportCanvasAsBase64(editorRef.current);
 
-      // Get original image base64
       let originalImage = imageMeta.base64 || '';
       if (!originalImage && imageMeta.objectUrl) {
-        // objectUrl is already a data URL
         originalImage = imageMeta.objectUrl.split(',')[1] || '';
       }
 
-      const response = await chrome.runtime.sendMessage({
-        type: 'SEND_TO_AI',
-        payload: { originalImage, annotatedImage, prompt },
+      const response = await new Promise<any>((resolve) => {
+        chrome.runtime.sendMessage(
+          { type: 'SEND_TO_GEMINI', payload: { originalImage, annotatedImage, prompt } },
+          resolve
+        );
       });
 
-      if (response.type === 'AI_RESPONSE') {
-        setAiResponse(response.payload.text);
+      if (response.type === 'GEMINI_RESPONSE') {
+        setResponseParts(response.payload.parts);
       } else if (response.type === 'AI_ERROR') {
         setAiError(response.payload.error);
       }
@@ -209,6 +185,24 @@ export function App() {
       setLoading(false);
     }
   }, [imageShapeId, imageMeta, instruction]);
+
+  // Load response image to canvas
+  const handleLoadResponseImage = useCallback(async (base64: string, mimeType: string) => {
+    if (!editorRef.current) return;
+
+    const byteChars = atob(base64);
+    const byteArray = new Uint8Array(byteChars.length);
+    for (let i = 0; i < byteChars.length; i++) {
+      byteArray[i] = byteChars.charCodeAt(i);
+    }
+    const blob = new Blob([byteArray], { type: mimeType });
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+
+    setImageMeta({ sourceUrl: 'gemini-response', objectUrl: dataUrl, base64 });
+
+    const shapeId = await insertImageToCanvas(editorRef.current, dataUrl, blob);
+    setImageShapeId(shapeId);
+  }, []);
 
   const handleCopyImage = useCallback(async () => {
     if (!editorRef.current) return;
@@ -232,7 +226,6 @@ export function App() {
     const selectedIds = editor.getSelectedShapeIds();
     if (selectedIds.length === 0) return;
 
-    // Check if the tracked image shape is being deleted
     if (imageShapeId && selectedIds.includes(imageShapeId)) {
       setImageShapeId(null);
       setImageMeta(null);
@@ -244,20 +237,13 @@ export function App() {
   const handleClearImage = useCallback(() => {
     if (!editorRef.current) return;
     const editor = editorRef.current;
-    // Delete all shapes on canvas
     const allIds = [...editor.getCurrentPageShapeIds()];
     editor.deleteShapes(allIds);
     setImageShapeId(null);
     setImageMeta(null);
-    setAiResponse(null);
+    setResponseParts([]);
     setAiError(null);
   }, []);
-
-  const handleSaveApiKey = useCallback(async () => {
-    await setApiKey(apiKeyInput);
-    setHasApiKey(true);
-    setShowSettings(false);
-  }, [apiKeyInput]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -273,60 +259,14 @@ export function App() {
   return (
     <div className="app-container">
       <Toolbar
-        hasApiKey={hasApiKey}
         hasImage={!!imageMeta}
         hasSelection={hasSelection}
         onCapture={handleCapture}
         onClearImage={handleClearImage}
         onDeleteSelected={handleDeleteSelected}
-        onSettings={() => setShowSettings(!showSettings)}
         onCopyImage={handleCopyImage}
         copyStatus={copyStatus}
       />
-
-      {!hasApiKey && (
-        <div className="api-key-bar">
-          <svg className="key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-          </svg>
-          <input
-            type="password"
-            placeholder="Paste API key to get started..."
-            value={apiKeyInput}
-            onChange={(e) => setApiKeyInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && apiKeyInput.trim()) {
-                handleSaveApiKey();
-              }
-            }}
-          />
-          <button onClick={handleSaveApiKey} disabled={!apiKeyInput.trim()}>
-            Save
-          </button>
-        </div>
-      )}
-
-      {showSettings && hasApiKey && (
-        <div className="api-key-bar">
-          <svg className="key-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-          </svg>
-          <input
-            type="password"
-            placeholder="Update API key..."
-            value={apiKeyInput}
-            onChange={(e) => setApiKeyInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && apiKeyInput.trim()) {
-                handleSaveApiKey();
-              }
-            }}
-          />
-          <button onClick={handleSaveApiKey} disabled={!apiKeyInput.trim()}>
-            Update
-          </button>
-        </div>
-      )}
 
       <div className="canvas-container">
         <CanvasEditor onEditorReady={handleEditorReady} />
@@ -353,13 +293,11 @@ export function App() {
         <button
           className={`send-btn ${loading ? 'loading' : ''}`}
           onClick={handleSend}
-          disabled={!imageMeta || !hasApiKey || loading}
+          disabled={!imageMeta || loading}
           title={
-            !hasApiKey
-              ? 'Set API key first'
-              : !imageMeta
-                ? 'Load an image first (right-click or paste)'
-                : 'Send to AI (⌘↵)'
+            !imageMeta
+              ? 'Load an image first (right-click or paste)'
+              : 'Send to AI (⌘↵)'
           }
         >
           {loading ? '' : (
@@ -374,11 +312,12 @@ export function App() {
         </button>
       </div>
 
-      {(loading || aiResponse || aiError) && (
+      {(loading || responseParts.length > 0 || aiError) && (
         <ResultPanel
           loading={loading}
-          response={aiResponse}
+          responseParts={responseParts}
           error={aiError}
+          onLoadImage={handleLoadResponseImage}
         />
       )}
     </div>

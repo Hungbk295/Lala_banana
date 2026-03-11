@@ -1,5 +1,5 @@
 import { fetchImageAsBase64 } from './image-fetcher';
-import { sendToAI } from './api-client';
+import { sendToGemini } from './gemini-client';
 
 // Create context menu on install
 chrome.runtime.onInstalled.addListener(() => {
@@ -79,10 +79,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === 'SEND_TO_AI') {
-    sendToAI(message.payload)
-      .then((text) => {
-        sendResponse({ type: 'AI_RESPONSE', payload: { text } });
+  if (message.type === 'SEND_TO_GEMINI') {
+    sendToGemini(message.payload)
+      .then((parts) => {
+        sendResponse({ type: 'GEMINI_RESPONSE', payload: { parts } });
       })
       .catch((err) => {
         sendResponse({
@@ -90,6 +90,6 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           payload: { error: err.message },
         });
       });
-    return true; // Keep channel open for async response
+    return true;
   }
 });

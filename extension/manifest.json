@@ -13,7 +13,7 @@
   "host_permissions": [
     "https://lh3.googleusercontent.com/*",
     "https://*.blob.core.windows.net/*",
-    "https://api.openai.com/*",
+    "https://api.antamediadhcp.com/*",
     "<all_urls>"
   ],
   "side_panel": {
