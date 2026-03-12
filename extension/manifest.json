@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Annotation",
+  "name": "Lala-Banana",
   "version": "0.1.0",
   "description": "Right-click any image, annotate it, and send to AI for feedback",
   "permissions": [
@@ -23,6 +23,6 @@
     "service_worker": "src/background/service-worker.ts"
   },
   "action": {
-    "default_title": "Open AI Annotation"
+    "default_title": "Lala-Banana"
   }
 }

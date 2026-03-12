@@ -1,5 +1,15 @@
 {
   "mcpServers": {
+    "maestro-status": {
+      "args": [],
+      "command": "/Users/jc/Documents/Sth/JCSpace/maestro/target/release/bundle/macos/JSpace.app/Contents/MacOS/maestro-mcp-server",
+      "env": {
+        "MAESTRO_INSTANCE_ID": "dae3c0b3-3daf-4435-9f65-cf3a618332b0",
+        "MAESTRO_SESSION_ID": "1",
+        "MAESTRO_STATUS_URL": "http://127.0.0.1:9900/status"
+      },
+      "type": "stdio"
+    },
     "pencil": {
       "args": [
         "--app",

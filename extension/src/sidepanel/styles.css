@@ -169,6 +169,60 @@ body {
 }
 
 /* ============================================
+   Toolbar accent button
+   ============================================ */
+
+.toolbar-btn.accent {
+  color: var(--macos-blue);
+}
+
+.toolbar-btn.accent:hover {
+  background: rgba(0, 122, 255, 0.1);
+}
+
+/* ============================================
+   Page tabs
+   ============================================ */
+
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 4px 10px;
+  background: var(--macos-toolbar);
+  border-bottom: 0.5px solid var(--macos-border);
+  overflow-x: auto;
+}
+
+.page-tabs::-webkit-scrollbar {
+  height: 0;
+}
+
+.page-tab {
+  padding: 4px 12px;
+  border: none;
+  border-radius: var(--macos-radius-sm);
+  background: transparent;
+  color: var(--macos-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--macos-transition), color var(--macos-transition);
+}
+
+.page-tab:hover {
+  background: var(--macos-fill-hover);
+  color: var(--macos-text);
+}
+
+.page-tab.active {
+  background: var(--macos-blue);
+  color: #ffffff;
+}
+
+/* ============================================
    Canvas
    ============================================ */
 
@@ -296,6 +350,240 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ============================================
+   Skills trigger button (magic wand)
+   ============================================ */
+
+.skills-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 0.5px solid var(--macos-input-border);
+  border-radius: var(--macos-radius);
+  background: var(--macos-input-bg);
+  color: var(--macos-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--macos-transition), color var(--macos-transition),
+    border-color var(--macos-transition), box-shadow var(--macos-transition);
+  box-shadow: var(--macos-shadow-sm);
+}
+
+.skills-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+.skills-trigger:hover {
+  background: var(--macos-fill-hover);
+  color: var(--macos-text);
+}
+
+.skills-trigger.active {
+  background: rgba(0, 122, 255, 0.08);
+  border-color: var(--macos-blue);
+  color: var(--macos-blue);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+
+.skills-trigger.has-skills {
+  color: var(--macos-blue);
+  border-color: rgba(0, 122, 255, 0.3);
+}
+
+.skills-trigger.has-skills::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  background: var(--macos-blue);
+  border-radius: 50%;
+  border: 1.5px solid var(--macos-toolbar);
+}
+
+/* ============================================
+   Skills panel — macOS sheet expanding upward
+   ============================================ */
+
+.skills-panel {
+  position: relative;
+  max-height: 0;
+  overflow: hidden;
+  background: var(--macos-toolbar);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 0 solid transparent;
+  transition: max-height 250ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 250ms ease, padding 250ms ease;
+  padding: 0 12px;
+}
+
+.skills-panel.open {
+  max-height: 280px;
+  border-top: 0.5px solid var(--macos-border-strong);
+  padding: 10px 12px 8px;
+}
+
+.skills-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.skills-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--macos-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.skills-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skills-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skills-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--macos-text-secondary);
+}
+
+/* Prompt template chips */
+.skills-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.skills-chip {
+  padding: 4px 10px;
+  border: 0.5px solid var(--macos-border);
+  border-radius: 12px;
+  background: var(--macos-input-bg);
+  color: var(--macos-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--macos-transition), color var(--macos-transition),
+    border-color var(--macos-transition);
+  line-height: 1;
+}
+
+.skills-chip:hover {
+  background: var(--macos-fill-hover);
+  color: var(--macos-text);
+}
+
+.skills-chip.active {
+  background: var(--macos-blue);
+  color: #ffffff;
+  border-color: var(--macos-blue);
+}
+
+/* Color palette list */
+.skills-palette-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 6px;
+}
+
+.skills-palette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 0.5px solid var(--macos-border);
+  border-radius: var(--macos-radius-sm);
+  background: var(--macos-input-bg);
+  cursor: pointer;
+  transition: border-color var(--macos-transition), box-shadow var(--macos-transition),
+    background var(--macos-transition);
+}
+
+.skills-palette:hover {
+  border-color: var(--macos-border-strong);
+  background: var(--macos-fill);
+}
+
+.skills-palette.active {
+  border-color: var(--macos-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+}
+
+.skills-swatches {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 16px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.skills-swatch {
+  flex: 1;
+  min-width: 0;
+}
+
+.skills-swatches-empty {
+  background: var(--macos-fill);
+  align-items: center;
+  justify-content: center;
+}
+
+.skills-swatch-none {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  position: relative;
+}
+
+.skills-swatch-none::before,
+.skills-swatch-none::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12px;
+  height: 1px;
+  background: var(--macos-text-tertiary);
+}
+
+.skills-swatch-none::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.skills-swatch-none::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+.skills-palette-label {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--macos-text-secondary);
+  text-align: center;
+  line-height: 1;
+}
+
+.skills-palette.active .skills-palette-label {
+  color: var(--macos-blue);
 }
 
 /* ============================================

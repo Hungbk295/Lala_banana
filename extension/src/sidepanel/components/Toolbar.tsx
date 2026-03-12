@@ -5,6 +5,7 @@ interface ToolbarProps {
   onClearImage: () => void;
   onCopyImage: () => void;
   onDeleteSelected: () => void;
+  onDuplicateToNewPage: () => void;
   copyStatus: 'idle' | 'copied' | 'error';
 }
 
@@ -50,6 +51,13 @@ const DeleteIcon = () => (
   </svg>
 );
 
+const DuplicateIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="8" y="8" width="12" height="12" rx="2" />
+    <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+  </svg>
+);
+
 export function Toolbar({
   hasImage,
   hasSelection,
@@ -57,6 +65,7 @@ export function Toolbar({
   onClearImage,
   onCopyImage,
   onDeleteSelected,
+  onDuplicateToNewPage,
   copyStatus,
 }: ToolbarProps) {
   const getCopyContent = () => {
@@ -80,14 +89,25 @@ export function Toolbar({
         </button>
 
         {hasSelection && (
-          <button
-            className="toolbar-btn danger"
-            onClick={onDeleteSelected}
-            title="Delete selected (Del)"
-          >
-            <DeleteIcon />
-            <span>Delete</span>
-          </button>
+          <>
+            <button
+              className="toolbar-btn danger"
+              onClick={onDeleteSelected}
+              title="Delete selected (Del)"
+            >
+              <DeleteIcon />
+              <span>Delete</span>
+            </button>
+
+            <button
+              className="toolbar-btn accent"
+              onClick={onDuplicateToNewPage}
+              title="Duplicate selected to new page"
+            >
+              <DuplicateIcon />
+              <span>Duplicate</span>
+            </button>
+          </>
         )}
 
         {hasImage && (

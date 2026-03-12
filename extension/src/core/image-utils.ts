@@ -176,6 +176,39 @@ export async function cropHighlightRegion(
   return canvas.toDataURL('image/jpeg', 0.9).split(',')[1];
 }
 
+export async function compressBase64ForAPI(base64: string, mimeType = 'image/jpeg'): Promise<string> {
+  const blob = base64ToBlob(base64, mimeType);
+  const img = await blobToImage(blob);
+
+  // Target max 1280px on longest side, JPEG quality 0.7
+  const maxDim = 1280;
+  const scale = Math.min(maxDim / Math.max(img.width, img.height), 1);
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.drawImage(img, 0, 0, w, h);
+
+  return new Promise((resolve) => {
+    canvas.toBlob(
+      (b) => {
+        if (!b) { resolve(base64); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(',')[1]);
+        };
+        reader.readAsDataURL(b);
+      },
+      'image/jpeg',
+      0.7
+    );
+  });
+}
+
 export function base64ToBlob(base64: string, mimeType = 'image/jpeg'): Blob {
   const byteChars = atob(base64);
   const byteNumbers = new Array(byteChars.length);
