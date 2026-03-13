@@ -4,6 +4,18 @@ export interface ImageMeta {
   base64?: string;
 }
 
+export interface ConversationEntry {
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
+}
+
+export interface ImageContext {
+  history: ConversationEntry[];
+  generation: number;
+  originalSourceUrl?: string;
+}
+
 export interface CanvasRect {
   x: number;
   y: number;

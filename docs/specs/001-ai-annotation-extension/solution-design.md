@@ -33,9 +33,9 @@ version: "1.0"
 
 CON-1 Chrome-only MVP using Manifest V3 and Side Panel API; extension UX must work in constrained side-panel width.
 CON-2 Right-click image flow must support CORS-restricted origins (e.g., Gemini CDN), so image fetch must run in service worker with proper host permissions.
-CON-3 Image+annotation requests must fit Claude Vision constraints; payload size target is <=1 MB for original image after compression.
+CON-3 Image+annotation requests must fit Gemini multimodal payload limits; payload size target is <=1 MB for original image after compression.
 CON-4 MVP scope excludes auto-annotate, multi-image sessions, real-time collaboration, and offline mode.
-CON-5 Repository currently contains design documentation only; implementation decisions must include bootstrap path for codebase initialization.
+CON-5 Current codebase is partially implemented; architecture decisions must reconcile legacy spec text with the actual extension source under `extension/src`.
 
 ## Implementation Context
 
@@ -66,7 +66,7 @@ CON-5 Repository currently contains design documentation only; implementation de
 
 - file: /Users/jc/Documents/TQCoding/Lala_Banana
   relevance: MEDIUM
-  why: "Repository inspection confirms no package manifests or source tree yet; impacts project commands and directory mapping assumptions."
+  why: "Repository inspection confirms a live extension codebase under `extension/`; used to validate current architecture, commands, and drift from the earlier draft spec."
 ```
 
 #### External APIs (if applicable)
@@ -76,10 +76,10 @@ CON-5 Repository currently contains design documentation only; implementation de
   relevance: CRITICAL
   why: "Defines sidePanel, contextMenus, runtime messaging, storage.session, and service worker lifecycle constraints."
 
-- service: Anthropic Messages API
-  doc: https://docs.anthropic.com/en/api/messages
+- service: Google Gemini GenerateContent API (via internal proxy)
+  doc: https://ai.google.dev/api/generate-content
   relevance: CRITICAL
-  why: "Defines multimodal request schema, auth headers, model selection, and error response structure."
+  why: "Defines multimodal request schema, response modalities, and image+text response contract used by the current implementation."
 
 - service: Googleusercontent image CDN behavior
   doc: https://lh3.googleusercontent.com/* (runtime URL pattern)
@@ -89,7 +89,7 @@ CON-5 Repository currently contains design documentation only; implementation de
 
 ### Implementation Boundaries
 
-- **Must Preserve**: Right-click-on-image entry, side panel editing workflow, shape-based annotation model (rectangle/arrow/text), and Claude multimodal integration.
+- **Must Preserve**: Right-click-on-image entry, side panel editing workflow, shape-based annotation model (rectangle/arrow/text), and Gemini multimodal integration.
 - **Can Modify**: Internal module layout, messaging handshake implementation details, exact UI composition, and host permission scope refinement.
 - **Must Not Touch**: Non-project systems, browser-level settings, and out-of-scope features from MVP exclusions.
 
@@ -102,7 +102,7 @@ graph TB
     User[End User in Chrome] --> Extension[AI Annotation Extension]
 
     WebPage[Current Website Tab] --> Extension
-    Extension --> ClaudeAPI[Anthropic Messages API]
+    Extension --> GeminiAPI[Gemini GenerateContent API via Proxy]
 
     GeminiCDN[Image CDN e.g. lh3.googleusercontent.com] --> Extension
     Extension --> ChromeStorage[(chrome.storage.local/session)]
@@ -135,11 +135,11 @@ inbound:
     data_flow: "draw annotations, input instruction, trigger send/export."
 
 outbound:
-  - name: "Anthropic Messages API"
+  - name: "Gemini GenerateContent API via Proxy"
     type: HTTPS
     format: JSON
-    authentication: x-api-key header
-    doc: https://docs.anthropic.com/en/api/messages
+    authentication: Bearer token to proxy
+    doc: https://ai.google.dev/api/generate-content
     data_flow: "original image + annotated image + structured prompt."
     criticality: HIGH
 
@@ -152,12 +152,6 @@ outbound:
     criticality: HIGH
 
 data:
-  - name: "Local Extension Config"
-    type: chrome.storage.local
-    connection: Chrome extension API
-    doc: https://developer.chrome.com/docs/extensions/reference/api/storage
-    data_flow: "stores API key and persistent settings."
-
   - name: "Session Pending Payload"
     type: chrome.storage.session
     connection: Chrome extension API
@@ -169,6 +163,12 @@ data:
     connection: React + tldraw runtime
     doc: https://tldraw.dev/
     data_flow: "source image asset + annotation shapes for parse/export."
+
+  - name: "Per-Page Session State"
+    type: In-memory React state keyed by `TLPageId`
+    connection: `sidepanel/App.tsx`
+    doc: @extension/src/sidepanel/App.tsx
+    data_flow: "tracks imageMeta, imageShapeId, responseParts, instruction, skills, and imageContext for each page."
 ```
 
 ### Cross-Component Boundaries (if applicable)
@@ -181,19 +181,12 @@ data:
 ### Project Commands
 
 ```bash
-# Core Commands (discovered from project files)
-Install: Not yet available (no package.json discovered in repository)
-Dev:     Not yet available (codebase bootstrap pending)
-Test:    Not yet available (test runner not configured)
-Lint:    Not yet available (linter config not present)
-Build:   Not yet available (build config not present)
-
-# Planned bootstrap commands once scaffolded
+# Core Commands (discovered from extension/package.json)
 Install: pnpm install
-Dev:     pnpm dev
-Test:    pnpm test
-Lint:    pnpm lint
-Build:   pnpm build
+Dev:     pnpm --dir extension dev
+Test:    Not configured
+Lint:    Not configured
+Build:   pnpm --dir extension build
 ```
 
 ## Solution Strategy
@@ -212,11 +205,11 @@ graph LR
     User --> ContextMenu[Chrome Context Menu]
     ContextMenu --> ServiceWorker[background/service-worker]
     ServiceWorker --> ImageFetcher[background/image-fetcher]
-    ServiceWorker --> APIClient[background/api-client]
+    ServiceWorker --> APIClient[background/gemini-client]
     SidePanelUI --> AnnotationParser[core/annotation-parser]
     SidePanelUI --> PromptBuilder[core/prompt-builder]
     SidePanelUI --> CoordTransform[core/coordinate-transform]
-    APIClient --> ClaudeAPI[Anthropic Messages API]
+    APIClient --> GeminiAPI[Gemini GenerateContent API]
     ImageFetcher --> ExternalImages[Cross-origin Image URLs]
     ServiceWorker --> ChromeStorage[(chrome.storage.*)]
     SidePanelUI --> ChromeStorage
@@ -232,7 +225,7 @@ graph LR
 │   ├── background/
 │   │   ├── service-worker.ts            # NEW: lifecycle, context menu, message routing
 │   │   ├── image-fetcher.ts             # NEW: CORS bypass image fetch and URL optimization
-│   │   └── api-client.ts                # NEW: Anthropic request handling
+│   │   └── gemini-client.ts             # NEW: Gemini proxy request handling + system prompt
 │   ├── sidepanel/
 │   │   ├── index.html                   # NEW: panel entry
 │   │   ├── App.tsx                      # NEW: state orchestration + runtime listeners
@@ -266,11 +259,11 @@ interfaces:
     sections: [sidePanel, contextMenus, runtime, storage, tabs]
     why: "Defines extension boundary contracts and permission-driven behavior."
 
-  - name: "Anthropic Messages API"
-    doc: https://docs.anthropic.com/en/api/messages
+  - name: "Gemini GenerateContent API"
+    doc: https://ai.google.dev/api/generate-content
     relevance: CRITICAL
-    sections: [authentication, content_blocks, error_handling]
-    why: "Defines outbound multimodal request and response contract."
+    sections: [contents, systemInstruction, generationConfig, inlineData]
+    why: "Defines outbound multimodal request and image/text response contract."
 
   - name: "Internal Message Contract"
     doc: @extension/core/types.ts (NEW)
@@ -282,10 +275,6 @@ interfaces:
 #### Data Storage Changes
 
 ```yaml
-Table: chrome.storage.local (logical keyspace)
-  ADD KEY: apiKey (string, encrypted at rest by Chrome profile)
-  ADD KEY: settings (object, optional future toggles)
-
 Table: chrome.storage.session (logical keyspace)
   ADD KEY: pendingImage (object: base64, sourceUrl, timestamp)
 
@@ -325,19 +314,19 @@ Endpoint: Runtime Message - Capture tab
 
 Endpoint: Outbound AI inference
   Method: HTTPS POST
-  Path: https://api.anthropic.com/v1/messages
+  Path: https://api.antamediadhcp.com/api/provider/google/v1beta/models/gemini-3.1-flash-image:generateContent
   Request:
-    model: string
-    max_tokens: number
-    messages: multimodal content blocks
+    systemInstruction.parts[]: text
+    contents[0].parts[]: [originalImage, annotatedImage, prompt]
+    generationConfig.responseModalities[]: ['TEXT', 'IMAGE']
   Response:
     success:
-      content[0].text: string
+      candidates[0].content.parts[]: [text?, inlineData?]
     error:
       error_code: API_ERROR
       message: string
 
-api_doc: @extension/background/api-client.ts (NEW)
+api_doc: @extension/background/gemini-client.ts
 openapi_spec: Not applicable (third-party API)
 ```
 
@@ -371,6 +360,37 @@ ENTITY: AIRequest (NEW)
     prompt: string
   BEHAVIORS:
     validateSize(maxBytes): boolean
+
+ENTITY: ConversationEntry (NEW)
+  FIELDS:
+    role: 'user' | 'model'
+    text: string
+    timestamp: number
+  BEHAVIORS:
+    appendToHistory(history): ConversationEntry[]
+
+ENTITY: ImageContext (NEW)
+  FIELDS:
+    history: ConversationEntry[]
+    generation: number
+    originalSourceUrl: string?
+  BEHAVIORS:
+    trimHistory(maxEntries): ImageContext
+    incrementGeneration(): ImageContext
+
+ENTITY: PageState (CURRENT IMPLEMENTATION)
+  FIELDS:
+    imageMeta: ImageMeta?
+    imageShapeId: TLShapeId?
+    responseParts: AIResponsePart[]
+    aiError: string?
+    loading: boolean
+    instruction: string
+    skills: SkillsConfig
+    imageContext: ImageContext
+  BEHAVIORS:
+    updatePageState(pageId, partial): PageState
+    resetOnClear(): PageState
 ```
 
 #### Integration Points
@@ -390,11 +410,11 @@ ENTITY: AIRequest (NEW)
     - endpoints: [parseAnnotations]
     - data_flow: "Convert editor shapes into structured annotation objects"
 
-Anthropic_API:
-  - doc: https://docs.anthropic.com/en/api/messages
-  - sections: [messages_create, errors]
-  - integration: "background/api-client sends multimodal prompt and receives textual result"
-  - critical_data: [originalImage, annotatedImage, prompt]
+Gemini_API:
+  - doc: https://ai.google.dev/api/generate-content
+  - sections: [generateContent, parts, inlineData]
+  - integration: "background/gemini-client sends multimodal prompt and receives text + image parts"
+  - critical_data: [originalImage, annotatedImage, prompt, systemInstruction]
 ```
 
 ### Implementation Examples
@@ -461,8 +481,8 @@ describe('parseAnnotations', () => {
 3. Side panel opens, reads pending payload, inserts image into tldraw canvas, and locks base image shape.
 4. User creates annotation shapes and optional instruction text.
 5. Side panel parses shapes, normalizes coordinates, builds prompt, and exports annotated canvas image.
-6. Background API client sends multimodal request to Claude API.
-7. AI response returns and renders in result panel.
+6. Background Gemini client sends multimodal request to proxy API.
+7. AI response returns text and optional generated image, then renders in result panel.
 
 ```mermaid
 sequenceDiagram
@@ -471,7 +491,7 @@ sequenceDiagram
     participant SW as Service Worker
     participant Panel as Side Panel App
     participant Parser as Annotation Parser
-    participant API as Anthropic API
+    participant API as Gemini API
 
     User->>Menu: Click "Edit with AI Annotation"
     Menu->>SW: onClicked(srcUrl)
@@ -482,11 +502,35 @@ sequenceDiagram
     User->>Panel: Draw and click Send
     Panel->>Parser: parse + normalize + build prompt
     Panel->>SW: send inference request
-    SW->>API: POST /v1/messages
-    API-->>SW: text response
+    SW->>API: POST generateContent
+    API-->>SW: text + image parts
     SW-->>Panel: AI result
     Panel-->>User: Render response
 ```
+
+#### Reviewed Flow: Iterative edit with response image and prompt history
+1. User sends page content to AI from the current `TLPageId`.
+2. App builds prompt from annotation summary, input prompt, selected skill templates, and `imageContext.history`.
+3. When AI returns, App appends a user/model pair into `imageContext.history`.
+4. If user clicks `Load to canvas`, response image is inserted into the current page and `imageContext.generation` is incremented.
+5. Subsequent sends include the accumulated edit history in the prompt.
+
+Design review of current implementation:
+- Improvement: the new `ImageContext` model in `core/types.ts` and `App.tsx` gives the system an explicit concept of iterative generations and prompt history.
+- Remaining gap: prompt composition is still split across UI (`SkillsPanel`), side-panel orchestration (`App.tsx`), core (`prompt-builder.ts`), and integration (`gemini-client.ts`), so there is no single canonical prompt envelope.
+- Remaining gap: async operations still capture `pageId` before `await`, but canvas insertion resolves against the editor's current page at execution time; this can still desynchronize multi-page state and rendered design assets.
+- Remaining gap: `Load to canvas` currently inserts a new image and promotes it to `imageMeta`, but does not define whether old annotations and previous images should be cleared, archived, or moved to a new page.
+
+#### Reviewed Flow: Multi-page design session
+Current behavior:
+- `pageStates` stores design metadata per `TLPageId`.
+- Duplicating selected shapes to a new page now attempts to carry both `imageMeta` and `imageContext`.
+- Prompt/history state therefore survives better across derived pages than before.
+
+Open architecture concerns:
+- There is still no first-class `PageDesignSession` aggregate to bind canvas page, source image, prompt lineage, and AI run history into one contract.
+- Deleting or mutating page contents can still invalidate `imageShapeId` and `imageMeta` without a reconciliation pass against the tldraw store.
+- The new-page duplication flow depends on shape discovery after page mutation, which remains fragile without an explicit target-page insertion API.
 
 ### Error Handling
 
@@ -516,8 +560,8 @@ OUTPUT: parsed_annotations, prompt_text
 
 ### Single Application Deployment
 - **Environment**: Client-side Chrome extension (MV3) running in user browser.
-- **Configuration**: `manifest.json` permissions/host permissions, API key in `chrome.storage.local`.
-- **Dependencies**: Chrome 114+, tldraw package, Anthropic API availability.
+- **Configuration**: `manifest.json` permissions/host permissions and proxy endpoint/model configuration in background client.
+- **Dependencies**: Chrome 114+, tldraw package, Gemini proxy availability.
 - **Performance**: Panel first interactive paint <= 2.5s on cold start; send pipeline <= 8s p95 excluding external API latency.
 
 ### Multi-Component Coordination (if applicable)
@@ -526,7 +570,7 @@ OUTPUT: parsed_annotations, prompt_text
 - **Version Dependencies**: Runtime message schema version in `core/types.ts` must match background + sidepanel builds.
 - **Feature Flags**: `settings.experimentalCrop` for optional crop-enhanced prompt path.
 - **Rollback Strategy**: Disable send action on severe API regressions; retain annotation editor as local-only fallback.
-- **Data Migration Sequencing**: No schema migration required; optional key rotation script for `chrome.storage.local`.
+- **Data Migration Sequencing**: No schema migration required; in-memory `imageContext` state resets on panel reload.
 
 ## Cross-Cutting Concepts
 
@@ -559,7 +603,7 @@ OUTPUT: parsed_annotations, prompt_text
 - Patterns: Clear loading states, inline error messages, deterministic send/disable states.
 
 **Interaction Design:**
-- State Management: Local React state + editor instance refs; no remote state store required for MVP.
+- State Management: Local React state + editor instance refs, now including per-page `imageContext` for iterative edit history.
 - Feedback: Toast on load errors, spinner during send, response panel status markers.
 - Accessibility: Keyboard support for paste/send, visible focus states, semantic button labels.
 
@@ -582,7 +626,7 @@ OUTPUT: parsed_annotations, prompt_text
 │             Canvas Editor               │
 │      (image + rect/arrow/text tools)    │
 │ ────────────────────────────────────    │
-│ Result Panel (Claude response)          │
+│ Result Panel (Gemini response)          │
 └─────────────────────────────────────────┘
 ```
 
@@ -592,7 +636,7 @@ flowchart LR
     A[Right-click Image] --> B[Open Side Panel]
     B --> C[Insert Image]
     C --> D[Annotate]
-    D --> E[Send to Claude]
+    D --> E[Send to Gemini]
     E --> F[Show Response]
     C --> G[Paste/Capture Fallback]
     G --> D
@@ -614,7 +658,7 @@ stateDiagram-v2
 
 ### System-Wide Patterns
 
-- Security: API key stored in local extension storage, no key in source, strict host permission rationale, input validation on runtime messages.
+- Security: Proxy credential currently exists in source and should be replaced by environment/config injection before release; input validation on runtime messages remains required.
 - Error Handling: Typed error codes in background modules, user-facing normalization in UI, retry with bounded attempts.
 - Performance: Lazy-load heavy editor runtime, pre-send image compression, optional crop extraction for focused context.
 - i18n/L10n: MVP English-first; UI copy centralized to enable later localization.
@@ -656,11 +700,26 @@ stateDiagram-v2
   - Trade-offs: Larger request size and processing overhead.
   - User confirmed: _Pending_
 
+- [ ] ADR-6 Multi-Page Session Model: Introduce a first-class `PageDesignSession` contract that owns page-level design state, prompt lineage, and AI run metadata.
+  - Rationale: Current `pageStates` map is sufficient for MVP but does not fully protect against drift between async canvas mutations and per-page React state.
+  - Trade-offs: More domain modeling and adapter code around tldraw page operations.
+  - User confirmed: _Pending_
+
+- [ ] ADR-7 Response Apply Mode: Define `Load to canvas` as one of `replace-base`, `new-variant-page`, or `reference-only`.
+  - Rationale: Current behavior inserts a new image and promotes it to the current source image, but leaves old images/annotations on the page, which makes iterative editing semantics ambiguous.
+  - Trade-offs: Stricter workflow but clearer model for subsequent sends.
+  - User confirmed: _Pending_
+
+- [ ] ADR-8 Prompt Composition Boundary: Centralize prompt assembly in a single `PromptComposer` domain service.
+  - Rationale: Prompt inputs are currently split across `SkillsPanel`, `App.tsx`, `prompt-builder.ts`, and `gemini-client.ts`, making the final prompt difficult to trace and test.
+  - Trade-offs: Slightly more abstraction, but much better debuggability and consistency.
+  - User confirmed: _Pending_
+
 ## Quality Requirements
 
 - Performance: Image import to canvas ready <= 2s p95 for 2048px images on typical laptop; prompt build <= 150ms p95.
 - Usability: Core flow (right-click -> annotate -> send) completable in <= 5 interactions; keyboard shortcuts for paste/send supported.
-- Security: API key never transmitted except to Anthropic endpoint; runtime message payload validation for required fields; no sensitive logs.
+- Security: Proxy token must not remain hard-coded for production; runtime message payload validation for required fields; no sensitive logs.
 - Reliability: Successful image handoff from context menu to panel >= 99% in manual test suite with repeated opens; parser must ignore unsupported shapes without crashing.
 
 ## Acceptance Criteria
@@ -671,7 +730,8 @@ stateDiagram-v2
 
 **Main Flow Criteria: AC-2 AI request generation**
 - [ ] WHEN user clicks Send with at least one image loaded, THE SYSTEM SHALL generate a prompt containing normalized coordinates and annotation semantics.
-- [ ] THE SYSTEM SHALL submit original image, annotated image, and prompt in a single Anthropic messages request.
+- [ ] THE SYSTEM SHALL submit original image, annotated image, and prompt in a single Gemini `generateContent` request.
+- [ ] THE SYSTEM SHALL preserve iterative edit history per page via `imageContext.history` and include it in prompt composition for follow-up edits.
 
 **Error Handling Criteria: AC-3 Import and API failures**
 - [ ] WHEN image fetch fails, THE SYSTEM SHALL show an actionable error and preserve editor state.
@@ -694,6 +754,8 @@ stateDiagram-v2
 - Initial MVP may use ad-hoc runtime message strings before introducing strict discriminated union typing.
 - Parser proximity heuristics (text-to-highlight matching) can be simplistic and may require refinement.
 - tldraw version pinning needed to avoid breaking API changes.
+- Current multi-page async flow can still write page state and insert canvas assets into different pages if the active page changes mid-operation.
+- Prompt history is now persisted in memory only; panel reload or service-worker-driven re-entry will reset iterative context.
 
 ### Implementation Gotchas
 
@@ -701,6 +763,7 @@ stateDiagram-v2
 - Gemini URL suffix optimization can fail for unrecognized variants; fallback path required.
 - Base64 conversion of large blobs can spike memory if not streamed/chunked.
 - Image MIME mismatch (png/webp/jpeg) must be normalized before API submission.
+- Response image import needs an explicit policy for old annotations/images, otherwise follow-up sends may carry stale visual context.
 
 ## Glossary
 
@@ -727,5 +790,5 @@ stateDiagram-v2
 |------|------------|---------|
 | `IMAGE_FROM_CONTEXT_MENU` | Internal runtime message carrying fetched image payload | SW -> sidepanel handoff |
 | `CAPTURE_TAB` | Internal runtime message to trigger visible tab screenshot capture | sidepanel/content -> SW flow |
-| Anthropic Messages API | HTTPS endpoint `/v1/messages` for multimodal Claude inference | Outbound AI integration |
+| Gemini GenerateContent API | HTTPS `generateContent` endpoint returning text and optional image parts | Outbound AI integration |
 | `chrome.storage.session` | Session-scoped extension storage | Race-safe pending payload relay |

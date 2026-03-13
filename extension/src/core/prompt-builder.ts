@@ -1,4 +1,6 @@
-import type { ParsedAnnotation } from './types';
+import type { ParsedAnnotation, ImageContext } from './types';
+
+const MAX_HISTORY_ENTRIES = 10; // 5 turns (user+model pairs)
 
 function describePosition(x: number, y: number): string {
   const horiz = x < 0.33 ? 'trái' : x < 0.66 ? 'giữa' : 'phải';
@@ -7,11 +9,39 @@ function describePosition(x: number, y: number): string {
   return `vùng ${vert}-${horiz}`;
 }
 
+export function trimHistory(history: ImageContext['history']): ImageContext['history'] {
+  if (history.length <= MAX_HISTORY_ENTRIES) return history;
+  // Keep first turn (original context) + most recent turns
+  return [
+    history[0],
+    history[1],
+    ...history.slice(-MAX_HISTORY_ENTRIES + 2),
+  ];
+}
+
 export function buildPrompt(
   annotations: ParsedAnnotation[],
-  userInstruction?: string
+  userInstruction?: string,
+  imageContext?: ImageContext
 ): string {
   const parts: string[] = [];
+
+  // Inject history if available
+  if (imageContext && imageContext.history.length > 0) {
+    parts.push('## Lịch sử chỉnh sửa trước đó');
+    for (let i = 0; i < imageContext.history.length; i += 2) {
+      const userEntry = imageContext.history[i];
+      const modelEntry = imageContext.history[i + 1];
+      const turnNum = Math.floor(i / 2) + 1;
+      parts.push(`Lần ${turnNum}:`);
+      parts.push(`  Yêu cầu: ${userEntry.text}`);
+      if (modelEntry) {
+        parts.push(`  Kết quả: ${modelEntry.text}`);
+      }
+    }
+    parts.push(`\nẢnh hiện tại là kết quả sau ${imageContext.generation} lần chỉnh sửa.`);
+    parts.push('---');
+  }
 
   parts.push('Đây là ảnh tôi đang làm việc. Ảnh thứ hai có annotation tôi vẽ lên.');
 

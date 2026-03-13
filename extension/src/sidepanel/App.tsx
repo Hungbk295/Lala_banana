@@ -8,8 +8,8 @@ import { SkillsPanel, buildSkillContext } from './components/SkillsPanel';
 import type { SkillsConfig } from './components/SkillsPanel';
 import { insertImageToCanvas, exportCanvasAsBase64, compressImage, compressBase64ForAPI, copyCanvasToClipboard } from '../core/image-utils';
 import { parseAnnotations } from '../core/annotation-parser';
-import { buildPrompt } from '../core/prompt-builder';
-import type { ImageMeta, AIResponsePart } from '../core/types';
+import { buildPrompt, trimHistory } from '../core/prompt-builder';
+import type { ImageMeta, AIResponsePart, ImageContext } from '../core/types';
 
 interface PageInfo {
   id: TLPageId;
@@ -24,11 +24,17 @@ interface PageState {
   loading: boolean;
   instruction: string;
   skills: SkillsConfig;
+  imageContext: ImageContext;
 }
 
 const defaultSkills = (): SkillsConfig => ({
   promptTemplate: 'none',
   colorTemplate: 'none',
+});
+
+const defaultImageContext = (): ImageContext => ({
+  history: [],
+  generation: 0,
 });
 
 const defaultPageState = (): PageState => ({
@@ -39,6 +45,7 @@ const defaultPageState = (): PageState => ({
   loading: false,
   instruction: '',
   skills: defaultSkills(),
+  imageContext: defaultImageContext(),
 });
 
 export function App() {
@@ -95,7 +102,11 @@ export function App() {
 
         const imageMeta = { sourceUrl: srcUrl, objectUrl: dataUrl, base64 };
         const shapeId = await insertImageToCanvas(editor, dataUrl, blob);
-        updatePageState(pageId, { imageMeta, imageShapeId: shapeId });
+        updatePageState(pageId, {
+          imageMeta,
+          imageShapeId: shapeId,
+          imageContext: { history: [], generation: 0, originalSourceUrl: srcUrl },
+        });
       } catch (err) {
         console.error('Failed to load image:', err);
       }
@@ -118,7 +129,10 @@ export function App() {
           { type: 'image/jpeg' }
         );
         const imageMeta = { sourceUrl: 'tab-capture', objectUrl: message.dataUrl, base64 };
-        updatePageState(pageId, { imageMeta });
+        updatePageState(pageId, {
+          imageMeta,
+          imageContext: { history: [], generation: 0, originalSourceUrl: 'tab-capture' },
+        });
         insertImageToCanvas(editorRef.current, message.dataUrl, blob).then((shapeId) => {
           updatePageState(pageId, { imageShapeId: shapeId });
         });
@@ -194,7 +208,11 @@ export function App() {
             const pageId = editorRef.current.getCurrentPageId();
             const imageMeta = { sourceUrl: 'clipboard', objectUrl: dataUrl };
             const shapeId = await insertImageToCanvas(editorRef.current, dataUrl, compressed);
-            updatePageState(pageId, { imageMeta, imageShapeId: shapeId });
+            updatePageState(pageId, {
+              imageMeta,
+              imageShapeId: shapeId,
+              imageContext: { history: [], generation: 0, originalSourceUrl: 'clipboard' },
+            });
           }
           break;
         }
@@ -244,8 +262,22 @@ export function App() {
       const skillContext = buildSkillContext(ps.skills);
       const userInstruction = [ps.instruction, skillContext].filter(Boolean).join('\n') || undefined;
 
-      const prompt = buildPrompt(annotations, userInstruction);
+      const imageContext = ps.imageContext || defaultImageContext();
+      const prompt = buildPrompt(annotations, userInstruction, imageContext);
       const annotatedImage = await exportCanvasAsBase64(editor);
+
+      // Build user history entry text (instruction + annotation summary)
+      const annotationSummary = annotations
+        .map((a) => {
+          if (a.type === 'instruction' && a.text) return a.text;
+          if (a.type === 'highlight' && a.text) return `khoanh: "${a.text}"`;
+          if (a.type === 'highlight') return 'khoanh vùng';
+          if (a.type === 'arrow') return 'mũi tên chỉ';
+          return '';
+        })
+        .filter(Boolean)
+        .join(', ');
+      const userHistoryText = [ps.instruction, annotationSummary].filter(Boolean).join(' — ') || 'xem ảnh';
 
       let originalImage = imageMeta.base64 || '';
       if (!originalImage && imageMeta.objectUrl) {
@@ -266,7 +298,23 @@ export function App() {
       });
 
       if (response.type === 'GEMINI_RESPONSE') {
-        updatePageState(pageId, { responseParts: response.payload.parts, loading: false });
+        // Extract model response text for history
+        const modelText = response.payload.parts
+          .filter((p: AIResponsePart) => p.type === 'text')
+          .map((p: AIResponsePart) => p.content)
+          .join(' ') || 'đã tạo ảnh';
+
+        const newHistory = trimHistory([
+          ...imageContext.history,
+          { role: 'user' as const, text: userHistoryText, timestamp: Date.now() },
+          { role: 'model' as const, text: modelText, timestamp: Date.now() },
+        ]);
+
+        updatePageState(pageId, {
+          responseParts: response.payload.parts,
+          loading: false,
+          imageContext: { ...imageContext, history: newHistory },
+        });
       } else if (response.type === 'AI_ERROR') {
         updatePageState(pageId, { aiError: response.payload.error, loading: false });
       }
@@ -280,6 +328,7 @@ export function App() {
     if (!editorRef.current) return;
     const editor = editorRef.current;
     const pageId = editor.getCurrentPageId();
+    const ps = pageStates[pageId] || defaultPageState();
 
     const byteChars = atob(base64);
     const byteArray = new Uint8Array(byteChars.length);
@@ -291,8 +340,13 @@ export function App() {
 
     const imageMeta = { sourceUrl: 'gemini-response', objectUrl: dataUrl, base64 };
     const shapeId = await insertImageToCanvas(editor, dataUrl, blob);
-    updatePageState(pageId, { imageMeta, imageShapeId: shapeId });
-  }, [updatePageState]);
+    const prevContext = ps.imageContext || defaultImageContext();
+    updatePageState(pageId, {
+      imageMeta,
+      imageShapeId: shapeId,
+      imageContext: { ...prevContext, generation: prevContext.generation + 1 },
+    });
+  }, [pageStates, updatePageState]);
 
   const handleCopyImage = useCallback(async () => {
     if (!editorRef.current) return;
@@ -347,7 +401,7 @@ export function App() {
       const newPageId = editor.getPages()[pageCount].id;
       editor.moveShapesToPage(duplicatedIds, newPageId);
 
-      // Carry over imageMeta to new page if image was duplicated
+      // Carry over imageMeta + imageContext to new page if image was duplicated
       if (duplicatingImage && sourceState.imageMeta) {
         // Find the image shape on the new page
         const newPageShapes = editor.getCurrentPageShapes();
@@ -356,6 +410,11 @@ export function App() {
           updatePageState(newPageId, {
             imageMeta: { ...sourceState.imageMeta },
             imageShapeId: newImageShape.id,
+            imageContext: {
+              history: [...sourceState.imageContext.history],
+              generation: sourceState.imageContext.generation,
+              originalSourceUrl: sourceState.imageContext.originalSourceUrl,
+            },
           });
         }
       }
@@ -381,6 +440,7 @@ export function App() {
       imageMeta: null,
       responseParts: [],
       aiError: null,
+      imageContext: defaultImageContext(),
     });
   }, [updatePageState]);
 
