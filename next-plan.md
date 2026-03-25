@@ -1,28 +1,98 @@
-# Next Plan
+# Next Plan — AI Annotation Extension Enhancement
 
-## Trạng thái hiện tại
-
-### Đã làm
-- ImageContext: lưu conversation history (text-only) per page
-- History carry qua khi duplicate to new page
-- History inject vào prompt để AI có context các lần edit trước
-- trimHistory giới hạn 10 entries (5 turns), giữ turn đầu + gần nhất
-
-### Chưa làm (backlog)
-- Gửi ảnh gốc (generation 0) kèm mỗi request để AI so sánh visual diff
-- Multi-turn conversation thực sự với ảnh (nặng, cân nhắc sau)
+> Last updated: 2026-03-13
 
 ---
 
-## Feature tiếp theo: Session Persistence
+## Research Insights (from competitive analysis)
+
+- Google built markup tools directly into Gemini (late 2025) — proves demand
+- No Chrome extension bridges annotation → AI vision API — real gap in market
+- Pi Annotate (GitHub) is closest competitor but focuses on bug reporting, not AI image editing
+- Structured prompts achieve 94.2% success rate on Gemini vs lower for free-text — validates annotation parser
+- Crop region + full image is industry standard (Adobe Firefly, Pi Annotate)
+- AI image quality degrades after multiple iteration rounds — fewer iterations = better results
+- Users complain about subscription fatigue — BYOK (bring your own key) model is a strength
+
+### Key sources
+- Adobe Firefly Generative Fill — brush mask + multi-option output
+- Google Gemini Markup Tools (late 2025) — native annotation-to-AI
+- Pi Annotate (GitHub) — per-element crops, numbered annotations
+- Marker.io — auto-metadata, AI Magic Rewrite, 2-way sync
+- BugHerd — pin-comment model, zero ambiguity feedback
+- Ziflow — version comparison, before/after slider
+- CHI 2024 PromptCharm — multi-modal prompting research validation
+
+---
+
+## Enhancement Roadmap
+
+### Phase 1 — Week 1: Core UX Improvements
+
+#### 1. Integrate Crop Highlight into Send Flow
+- **Status:** Code exists (`cropHighlightRegion()`) but NOT called in send flow
+- **What:** When user draws rectangle highlight → crop that region → send alongside full image + cropped region
+- **Why:** Adobe Firefly & Pi Annotate both validate this pattern. Reduces iteration rounds.
+- **Impact: HIGH** | **Effort: LOW** (code already exists)
+
+#### 2. Before/After Comparison
+- **What:** When AI returns a new image, show slider overlay or side-by-side with original
+- **Why:** Ziflow, Adobe Firefly both have this. Users need fast result evaluation.
+- **Impact: HIGH** | **Effort: MEDIUM**
+
+### Phase 2 — Week 2: Annotation UX
+
+#### 3. Pin-Comment Mode
+- **What:** Click a point on image → popup to type instruction right there
+- **Why:** BugHerd "point, click, pin" model. Much simpler than draw rectangle + draw text separately
+- **Impact: HIGH** | **Effort: MEDIUM**
+
+#### 4. Auto-number Annotations
+- **What:** Each annotation gets a numbered badge (1, 2, 3...) on canvas. Prompt references by number.
+- **Why:** Every major feedback tool does this (Marker.io, Pi Annotate, BugHerd)
+- **Impact: MEDIUM** | **Effort: LOW**
+
+### Phase 3 — Week 3: AI Intelligence
+
+#### 5. Re-generation Prompt Suggestion
+- **What:** AI response includes a ready-to-paste prompt for Gemini to regenerate the image better
+- **Why:** Closes the feedback loop. Unique value proposition — no other tool does this.
+- **Impact: HIGH** | **Effort: LOW** (prompt engineering)
+
+#### 6. Brush Mask Tool
+- **What:** Let user "paint" the region to edit instead of only rectangles
+- **Why:** Adobe Firefly generative fill gold standard. Irregular regions can't be covered by rectangles.
+- **Impact: HIGH** | **Effort: HIGH** (custom tldraw tool or canvas overlay)
+
+### Phase 4 — Week 4: Platform & Polish
+
+#### 7. Multi-AI Support
+- **What:** Add Claude Vision, GPT-4o alongside Gemini. User selects in settings.
+- **Why:** Differentiator vs Google's built-in markup (Gemini-only)
+- **Impact: MEDIUM** | **Effort: MEDIUM**
+
+#### 8. Export to AI Chat
+- **What:** Button "Open in Gemini" → opens tab with pre-built prompt. Or copy to clipboard for any AI.
+- **Impact: MEDIUM** | **Effort: LOW**
+
+#### 9. Quick Actions (No-annotation)
+- **What:** Buttons: "Remove background", "Upscale", "Change style to..." — 1-click, no annotation needed
+- **Impact: MEDIUM** | **Effort: MEDIUM**
+
+#### 10. Auto-metadata Context
+- **What:** Auto-capture source URL, page title, image dimensions, original prompt (if from Gemini)
+- **Why:** Marker.io validates this — context users forget to provide
+- **Impact: LOW-MEDIUM** | **Effort: LOW**
+
+---
+
+## Existing Backlog: Session Persistence
 
 ### Bài toán
 Khi user đóng side panel hoặc đóng browser → mở lại, toàn bộ state mất:
 - Canvas shapes (ảnh, annotation)
 - Page states (imageMeta, imageContext, instruction, skills)
 - Response history
-
-Cần lưu session để user quay lại làm việc tiếp.
 
 ### Storage choice: `chrome.storage.local`
 
@@ -41,49 +111,19 @@ Thêm `"unlimitedStorage"` vào `manifest.json` permissions để bỏ giới h�
 
 ```
 Session {
-  // tldraw canvas state — serialized store snapshot
   tldrawSnapshot: TLStoreSnapshot;
-
-  // App-level state per page
   pageStates: Record<pageId, {
     imageMeta: ImageMeta | null;
     imageShapeId: string | null;
     imageContext: ImageContext;
     instruction: string;
     skills: SkillsConfig;
-    responseParts: AIResponsePart[];  // để hiện lại response panel
+    responseParts: AIResponsePart[];
   }>;
-
-  // Metadata
   currentPageId: string;
   savedAt: number;
 }
 ```
-
-### Vấn đề kích thước
-
-- tldraw snapshot chứa asset data (base64 images) → có thể rất lớn
-- 1 ảnh compressed ~200-500KB base64
-- 5 pages x 2 ảnh = ~2-5MB
-- `chrome.storage.local` với `unlimitedStorage` → OK
-- Nếu không muốn `unlimitedStorage`: tách image data ra IndexedDB
-
-### Chiến lược lưu/restore
-
-#### Khi nào lưu (auto-save)
-- Debounced save sau mỗi thay đổi quan trọng:
-  - Sau khi nhận AI response
-  - Sau khi load image to canvas
-  - Sau khi duplicate page
-  - Khi side panel `beforeunload` / `visibilitychange`
-- Debounce 2-3 giây để tránh write quá nhiều
-- KHÔNG save trên mỗi mouse move / shape drag (quá thường xuyên)
-
-#### Khi nào restore
-- Side panel mount (`App.tsx useEffect[]`)
-- Check `chrome.storage.local` cho session data
-- Nếu có → restore tldraw snapshot + pageStates
-- Nếu không → start fresh
 
 ### Implementation plan
 
@@ -91,168 +131,54 @@ Session {
 
 ```typescript
 // core/session.ts
-
-import type { Editor } from 'tldraw';
-
 interface SessionData {
-  tldrawSnapshot: any;  // editor.store.getStoreSnapshot()
+  tldrawSnapshot: any;
   pageStates: Record<string, PageState>;
   currentPageId: string;
   savedAt: number;
 }
 
-export function serializeSession(editor: Editor, pageStates, currentPageId): SessionData {
+export function serializeSession(editor, pageStates, currentPageId): SessionData {
   return {
     tldrawSnapshot: editor.store.getStoreSnapshot(),
-    pageStates: sanitizePageStates(pageStates),  // remove non-serializable fields
+    pageStates: sanitizePageStates(pageStates),
     currentPageId,
     savedAt: Date.now(),
   };
 }
-
-export function sanitizePageStates(states): Record<string, any> {
-  // Remove objectUrl (blob URLs invalid after reload)
-  // Keep base64, sourceUrl, imageContext, instruction, skills, responseParts
-  const clean = {};
-  for (const [pageId, state] of Object.entries(states)) {
-    clean[pageId] = {
-      ...state,
-      loading: false,
-      aiError: null,
-      imageMeta: state.imageMeta ? {
-        sourceUrl: state.imageMeta.sourceUrl,
-        objectUrl: '',  // will be reconstructed from base64
-        base64: state.imageMeta.base64,
-      } : null,
-    };
-  }
-  return clean;
-}
 ```
 
-#### Step 2: Save logic (debounced)
+#### Step 2: Debounced auto-save in App.tsx
 
-```typescript
-// Trong App.tsx
+- Save after: AI response, load image, duplicate page, visibilitychange
+- Debounce 3s to avoid excessive writes
+- Sync save on beforeunload
 
-const saveSession = useCallback(
-  debounce(() => {
-    if (!editorRef.current) return;
-    const data = serializeSession(editorRef.current, pageStates, currentPageId);
-    chrome.storage.local.set({ session: data });
-  }, 3000),
-  [pageStates, currentPageId]
-);
+#### Step 3: Restore on mount
 
-// Trigger save sau các action quan trọng
-// Option A: gọi saveSession() manual sau handleSend, handleLoadResponseImage, etc.
-// Option B: useEffect watch pageStates changes → auto save (simpler)
+- Check chrome.storage.local for session
+- If < 7 days old → restore tldraw snapshot + pageStates
+- Reconstruct objectUrl from base64
 
-useEffect(() => {
-  saveSession();
-}, [pageStates, currentPageId]);
+#### Step 4: Clear session on "New Session" or "Clear All"
 
-// Save on unload
-useEffect(() => {
-  const handleUnload = () => {
-    if (!editorRef.current) return;
-    const data = serializeSession(editorRef.current, pageStates, currentPageId);
-    // Sync write — beforeunload cannot be async
-    chrome.storage.local.set({ session: data });
-  };
-  window.addEventListener('beforeunload', handleUnload);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') handleUnload();
-  });
-  return () => window.removeEventListener('beforeunload', handleUnload);
-}, [pageStates, currentPageId]);
-```
-
-#### Step 3: Restore logic
-
-```typescript
-// Trong App.tsx — handleEditorReady hoặc useEffect riêng
-
-async function restoreSession(editor: Editor) {
-  const result = await chrome.storage.local.get('session');
-  if (!result.session) return false;
-
-  const session: SessionData = result.session;
-
-  // Kiểm tra session không quá cũ (ví dụ < 7 ngày)
-  if (Date.now() - session.savedAt > 7 * 24 * 60 * 60 * 1000) {
-    await chrome.storage.local.remove('session');
-    return false;
-  }
-
-  // Restore tldraw store
-  editor.store.loadStoreSnapshot(session.tldrawSnapshot);
-
-  // Restore page states
-  // Reconstruct objectUrl from base64 for imageMeta
-  const restoredStates = {};
-  for (const [pageId, state] of Object.entries(session.pageStates)) {
-    restoredStates[pageId] = {
-      ...state,
-      imageMeta: state.imageMeta?.base64 ? {
-        ...state.imageMeta,
-        objectUrl: `data:image/jpeg;base64,${state.imageMeta.base64}`,
-      } : state.imageMeta,
-    };
-  }
-  setPageStates(restoredStates);
-
-  // Navigate to saved page
-  if (session.currentPageId) {
-    editor.setCurrentPage(session.currentPageId);
-    setCurrentPageId(session.currentPageId);
-  }
-
-  return true;
-}
-```
-
-#### Step 4: Clear session
-
-```typescript
-// Thêm button "New Session" hoặc tự clear khi user bấm Clear All
-async function clearSession() {
-  await chrome.storage.local.remove('session');
-}
-```
-
-#### Step 5: manifest.json
-
-```json
-{
-  "permissions": [
-    "activeTab",
-    "storage",
-    "unlimitedStorage",  // ← thêm
-    "sidePanel",
-    "contextMenus"
-  ]
-}
-```
-
-### Edge cases cần xử lý
+### Edge cases
 
 | Case | Xử lý |
 |------|--------|
-| Session quá cũ (> 7 ngày) | Auto clear, start fresh |
-| Storage quota exceeded | Catch error, xóa responseParts (lớn nhất) rồi retry |
-| tldraw version upgrade làm snapshot incompatible | Wrap restore trong try/catch, start fresh nếu fail |
-| User mở extension trên 2 tab cùng lúc | Mỗi tab save/restore độc lập? Hoặc last-write-wins |
-| Restore xong user right-click ảnh mới | Ảnh mới load bình thường, overwrite page state |
-| base64 quá lớn cho storage | Nén ảnh trước khi lưu (reuse compressBase64ForAPI) |
-| Side panel re-render nhưng không phải fresh open | Check flag `sessionRestored` để tránh restore lặp |
+| Session > 7 days old | Auto clear, start fresh |
+| Storage quota exceeded | Remove responseParts (largest), retry |
+| tldraw version incompatible snapshot | try/catch, start fresh |
+| 2 tabs open simultaneously | Last-write-wins |
+| base64 too large | Compress before saving |
 
-### Thứ tự implement
+---
 
-1. Tạo `core/session.ts` — serialize/deserialize/sanitize functions
-2. Thêm `unlimitedStorage` vào manifest
-3. Thêm restore logic vào `handleEditorReady`
-4. Thêm debounced auto-save vào `App.tsx`
-5. Thêm `beforeunload` / `visibilitychange` save
-6. Thêm clear session khi "Clear All" hoặc "New Session"
-7. Test: mở → load ảnh → annotate → send → đóng → mở lại → verify state
+## Known Tech Debt (from SDD review)
+
+- [ ] Hardcoded API key `sk-jc-key-1` in gemini-client.ts — move to chrome.storage.local
+- [ ] Crop highlight function exists but not integrated into send flow
+- [ ] No reconciliation when imageShapeId is invalidated by page mutations
+- [ ] Page switch mid-async can desync state
+- [ ] Prompt composition split across 4 files (SkillsPanel, App.tsx, prompt-builder, gemini-client)
+- [ ] Test whether Gemini actually uses structured coordinates (A/B test)
